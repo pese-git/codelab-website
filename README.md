@@ -152,4 +152,4 @@ npm run deploy
 - [Docusaurus Documentation](https://docusaurus.io/docs)
 - [Markdown Features](https://docusaurus.io/docs/markdown-features)
 - [Docusaurus Guides](https://docusaurus.io/docs/category/guides)
-- [CodeLab Repository](https://github.com/openidealab/codelab-workspace)
+- [CodeLab Repository](https://github.com/pese-git/codelab-workspace)

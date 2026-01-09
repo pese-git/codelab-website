@@ -243,4 +243,4 @@ uv pip install -e '.[dev]'
 
 - [Системные требования](/docs/getting-started/system-requirements)
 - [Руководство по участию](/docs/development/contributing)
-- [GitHub Issues](https://github.com/openidealab/codelab-workspace/issues)
+- [GitHub Issues](https://github.com/pese-git/codelab-workspace/issues)

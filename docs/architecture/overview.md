@@ -383,4 +383,4 @@ cd codelab-ai-service && docker compose up -d
 
 - [Руководство по разработке](/docs/development/ide)
 - [Участие в проекте](/docs/development/contributing)
-- [GitHub Repository](https://github.com/openidealab/codelab-workspace)
+- [GitHub Repository](https://github.com/pese-git/codelab-workspace)

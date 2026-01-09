@@ -311,6 +311,6 @@ netstat -ano | findstr :8002
 
 Если у вас возникли проблемы с системными требованиями:
 
-- Создайте [Issue на GitHub](https://github.com/openidealab/codelab-workspace/issues)
+- Создайте [Issue на GitHub](https://github.com/pese-git/codelab-workspace/issues)
 - Проверьте [FAQ](/docs/getting-started/installation#устранение-проблем)
 - Обратитесь к сообществу

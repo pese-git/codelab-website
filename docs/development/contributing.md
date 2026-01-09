@@ -142,7 +142,7 @@ class myService:
 
 ## Сообщение об ошибках
 
-Используйте [GitHub Issues](https://github.com/openidealab/codelab-workspace/issues):
+Используйте [GitHub Issues](https://github.com/pese-git/codelab-workspace/issues):
 
 1. Проверьте, не создана ли уже такая issue
 2. Используйте шаблон issue
@@ -173,8 +173,8 @@ class myService:
 
 ## Контакты
 
-- GitHub Issues: [github.com/openidealab/codelab-workspace/issues](https://github.com/openidealab/codelab-workspace/issues)
-- Discussions: [github.com/openidealab/codelab-workspace/discussions](https://github.com/openidealab/codelab-workspace/discussions)
+- GitHub Issues: [github.com/openidealab/codelab-workspace/issues](https://github.com/pese-git/codelab-workspace/issues)
+- Discussions: [github.com/openidealab/codelab-workspace/discussions](https://github.com/pese-git/codelab-workspace/discussions)
 
 ## Следующие шаги
 

@@ -137,16 +137,16 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/openidealab/codelab-workspace',
+              href: 'https://github.com/pese-git/codelab-workspace',
             },
             {
-              label: 'OpenIdeaLab',
-              href: 'https://github.com/openidealab',
+              label: 'CodeLab',
+              href: 'https://github.com/pese-git',
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} OpenIdeaLab. Создано с помощью Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} CodeLab. Создано с помощью Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,

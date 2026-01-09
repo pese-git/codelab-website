@@ -106,11 +106,11 @@ CodeLab построен на микросервисной архитектур�
 
 ## 🔗 Полезные ссылки
 
-- [GitHub Repository](https://github.com/openidealab/codelab-workspace)
-- [OpenIdeaLab](https://github.com/openidealab)
+- [GitHub Repository](https://github.com/pese-git/codelab-workspace)
+- [CodeLab](https://github.com/pese-git)
 - [Flutter](https://flutter.dev)
 - [FastAPI](https://fastapi.tiangolo.com)
 
 ---
 
-**Сделано с ❤️ командой OpenIdeaLab**
+**Сделано с ❤️ командой CodeLab**

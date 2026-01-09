@@ -1,0 +1,55 @@
+# Зависимости
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Сборка и кэш
+build
+.docusaurus
+.cache
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Документация и прочее
+README.md
+CHANGELOG.md
+LICENSE
+
+# Тесты
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+__tests__
+coverage
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local

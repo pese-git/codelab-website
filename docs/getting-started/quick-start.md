@@ -356,5 +356,5 @@ cd codelab-ai-service
 
 - [Системные требования](/docs/getting-started/system-requirements)
 - [Установка](/docs/getting-started/installation)
-- [GitHub Repository](https://github.com/openidealab/codelab-workspace)
-- [Сообщить о проблеме](https://github.com/openidealab/codelab-workspace/issues)
+- [GitHub Repository](https://github.com/pese-git/codelab-workspace)
+- [Сообщить о проблеме](https://github.com/pese-git/codelab-workspace/issues)

@@ -527,4 +527,4 @@ channel.stream.listen((message) {
 - [Tools Specification](/docs/api/tools-specification) - Спецификация инструментов
 - [Agent Protocol](/docs/api/agent-protocol) - Расширенный протокол агента
 - [Gateway API](/docs/api/gateway) - Документация Gateway Service
-- [GitHub Repository](https://github.com/openidealab/codelab-workspace)
+- [GitHub Repository](https://github.com/pese-git/codelab-workspace)

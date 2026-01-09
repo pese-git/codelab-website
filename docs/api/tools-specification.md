@@ -586,4 +586,4 @@ sidebar_position: 3
 - [WebSocket Protocol](/docs/api/websocket-protocol) - Протокол взаимодействия
 - [Agent Protocol](/docs/api/agent-protocol) - Расширенный протокол агента
 - [Архитектура](/docs/architecture/overview) - Обзор архитектуры
-- [GitHub Repository](https://github.com/openidealab/codelab-workspace)
+- [GitHub Repository](https://github.com/pese-git/codelab-workspace)
