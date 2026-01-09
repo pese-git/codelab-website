@@ -1,47 +1,116 @@
 ---
 sidebar_position: 1
+slug: /
 ---
 
-# Tutorial Intro
+# Добро пожаловать в CodeLab
 
-Let's discover **Docusaurus in less than 5 minutes**.
+**CodeLab** — это интегрированная среда разработки (IDE) с поддержкой AI-ассистента, построенная на современном технологическом стеке. Проект объединяет кроссплатформенный Flutter-интерфейс и микросервисную архитектуру AI-сервиса для эффективной разработки кода.
 
-## Getting Started
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Flutter](https://img.shields.io/badge/Flutter-3.38.5-02569B?logo=flutter)
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python)
 
-Get started by **creating a new site**.
+## 🎯 Основные возможности
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+### IDE (Flutter)
+- ✅ **Кроссплатформенность** - Windows, Linux, macOS
+- ✅ **Редактор кода** - Подсветка синтаксиса для множества языков
+- ✅ **Навигация по проекту** - Дерево файлов с быстрым поиском
+- ✅ **Встроенный терминал** - Выполнение команд и скриптов
+- ✅ **AI Ассистент** - Интеллектуальная помощь в написании кода
+- ✅ **Модульная архитектура** - Чистое разделение ответственности
 
-### What you'll need
+### AI Service (Python)
+- ✅ **Микросервисная архитектура** - Gateway, Agent Runtime, LLM Proxy
+- ✅ **Поддержка множества LLM** - OpenAI, Anthropic, Ollama (локальные модели)
+- ✅ **WebSocket API** - Потоковая передача данных в реальном времени
+- ✅ **Управление контекстом** - Сохранение истории диалогов
+- ✅ **Инструменты для работы с кодом** - Анализ, рефакторинг, генерация
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+## 🚀 Быстрый старт
 
-## Generate a new site
+Для начала работы с CodeLab выполните следующие шаги:
 
-Generate a new Docusaurus site using the **classic template**.
+1. **[Установка](/docs/getting-started/installation)** - Установите необходимые компоненты
+2. **[Быстрый старт](/docs/getting-started/quick-start)** - Запустите IDE и AI сервис
+3. **[Системные требования](/docs/getting-started/system-requirements)** - Проверьте требования к системе
 
-The classic template will automatically be added to your project after you run the command:
+## 📁 Структура проекта
 
-```bash
-npm init docusaurus@latest my-website classic
+```
+codelab-workspace/
+├── codelab_ide/              # Flutter IDE приложение
+│   ├── apps/codelab_ide/     # Основное приложение
+│   └── packages/             # Модульные пакеты
+├── codelab-ai-service/       # AI сервис (микросервисы)
+│   ├── gateway/              # WebSocket прокси
+│   ├── agent-runtime/        # AI логика и оркестрация
+│   └── llm-proxy/            # Унифицированный доступ к LLM
+└── doc/                      # Документация проекта
 ```
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+## 🔌 Архитектура
 
-The command also installs all necessary dependencies you need to run Docusaurus.
+CodeLab построен на микросервисной архитектуре, где Flutter IDE взаимодействует с AI сервисом через WebSocket:
 
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
+```
+┌─────────────────┐
+│   CodeLab IDE   │  (Flutter Desktop)
+└────────┬────────┘
+         │ WebSocket
+         ↓
+┌─────────────────┐
+│    Gateway      │  (WebSocket Proxy)
+└────────┬────────┘
+         │ HTTP/SSE
+         ↓
+┌─────────────────┐
+│ Agent Runtime   │  (AI Logic)
+└────────┬────────┘
+         │
+    ┌────┴────┬──────────┐
+    ↓         ↓          ↓
+┌────────┐ ┌──────┐ ┌────────┐
+│ OpenAI │ │Claude│ │ Ollama │
+└────────┘ └──────┘ └────────┘
 ```
 
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
+Подробнее об архитектуре читайте в разделе [Архитектура](/docs/architecture/overview).
 
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
+## 📚 Документация
 
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+### Для пользователей
+- [Установка](/docs/getting-started/installation) - Как установить CodeLab
+- [Быстрый старт](/docs/getting-started/quick-start) - Первые шаги
+- [Системные требования](/docs/getting-started/system-requirements) - Требования к системе
+
+### Для разработчиков
+- [Разработка IDE](/docs/development/ide) - Работа с Flutter приложением
+- [Разработка AI Service](/docs/development/ai-service) - Работа с микросервисами
+- [Участие в проекте](/docs/development/contributing) - Как внести вклад
+- [Тестирование](/docs/development/testing) - Запуск тестов
+
+### API и протоколы
+- [WebSocket Protocol](/docs/api/websocket-protocol) - Протокол взаимодействия
+- [Agent Protocol](/docs/api/agent-protocol) - Расширенный протокол агента
+- [Tools Specification](/docs/api/tools-specification) - Спецификация инструментов
+
+## 🤝 Участие в разработке
+
+Мы приветствуем вклад в развитие проекта! Ознакомьтесь с [руководством по участию](/docs/development/contributing).
+
+## 📝 Лицензия
+
+Проект распространяется под лицензией MIT. Подробности в файле LICENSE.
+
+## 🔗 Полезные ссылки
+
+- [GitHub Repository](https://github.com/openidealab/codelab-workspace)
+- [OpenIdeaLab](https://github.com/openidealab)
+- [Flutter](https://flutter.dev)
+- [FastAPI](https://fastapi.tiangolo.com)
+
+---
+
+**Сделано с ❤️ командой OpenIdeaLab**
