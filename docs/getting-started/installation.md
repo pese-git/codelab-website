@@ -16,7 +16,7 @@ sidebar_position: 1
 
 ```bash
 # Клонировать с подмодулями
-git clone --recursive https://github.com/openidealab/codelab-workspace.git
+git clone --recursive https://github.com/pese-git/codelab-workspace.git
 cd codelab-workspace
 
 # Если уже клонировали без --recursive

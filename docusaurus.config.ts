@@ -42,7 +42,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl:
-            'https://github.com/openidealab/codelab-workspace/tree/main/website/',
+            'https://github.com/pese-git/codelab-workspace/tree/main/website/',
         },
         blog: {
           showReadingTime: true,
@@ -51,7 +51,7 @@ const config: Config = {
             xslt: true,
           },
           editUrl:
-            'https://github.com/openidealab/codelab-workspace/tree/main/website/',
+            'https://github.com/pese-git/codelab-workspace/tree/main/website/',
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
@@ -83,7 +83,7 @@ const config: Config = {
           label: 'Документация',
         },
         {
-          href: 'https://github.com/openidealab/codelab-workspace',
+          href: 'https://github.com/pese-git/codelab-workspace',
           label: 'GitHub',
           position: 'right',
         },

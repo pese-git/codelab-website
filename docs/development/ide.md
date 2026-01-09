@@ -54,7 +54,7 @@ dart pub global activate melos
 ### 3. Клонирование репозитория
 
 ```bash
-git clone https://github.com/openidealab/codelab-workspace.git
+git clone https://github.com/pese-git/codelab-workspace.git
 cd codelab-workspace/codelab_ide
 ```
 

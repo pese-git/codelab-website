@@ -45,7 +45,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ### 2. Клонирование репозитория
 
 ```bash
-git clone https://github.com/openidealab/codelab-workspace.git
+git clone https://github.com/pese-git/codelab-workspace.git
 cd codelab-workspace/codelab-ai-service
 ```
 
