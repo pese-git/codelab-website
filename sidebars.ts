@@ -39,10 +39,20 @@ const sidebars: SidebarsConfig = {
       items: [
         'api/websocket-protocol',
         'api/agent-protocol',
+        'api/multi-agent-system',
         'api/tools-specification',
         'api/gateway',
         'api/agent-runtime',
         'api/llm-proxy',
+        'api/auth-service',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Руководства',
+      items: [
+        'guides/auth-integration',
+        'guides/multi-agent-integration',
       ],
     },
     {
