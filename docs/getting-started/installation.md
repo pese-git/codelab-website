@@ -142,6 +142,173 @@ curl http://localhost:8002/health
 {"status": "healthy"}
 ```
 
+### 6. Создание тестового пользователя
+
+Для работы с AI Assistant необходимо создать пользователя в Auth Service:
+
+```bash
+# Войти в контейнер auth-service
+docker compose exec auth-service python -c "
+from app.core.seed import seed_default_data
+import asyncio
+asyncio.run(seed_default_data())
+"
+```
+
+Будет создан тестовый пользователь:
+- **Email**: `test@codelab.local`
+- **Password**: `Test123!@#`
+
+**Важно**: В production окружении измените пароль!
+
+## Установка в Kubernetes (Production)
+
+Для production развертывания используйте Helm chart.
+
+### 1. Предварительные требования
+
+- Kubernetes 1.19+
+- Helm 3.0+
+- kubectl настроен для доступа к кластеру
+- Nginx Ingress Controller (опционально)
+
+### 2. Установка Helm chart
+
+```bash
+# Перейти в директорию chart
+cd codelab-chart
+
+# Создать namespace
+kubectl create namespace codelab
+
+# Установить chart
+helm install codelab . -n codelab
+```
+
+### 3. Настройка для production
+
+Создайте файл `production-values.yaml`:
+
+```yaml
+environment: production
+replicaCount: 3
+
+ingress:
+  enabled: true
+  host: codelab.yourdomain.com
+  tls: true
+  tlsSecretName: codelab-tls
+
+services:
+  authService:
+    database:
+      type: postgres
+      useInternal: false
+      host: external-postgres.example.com
+      port: 5432
+      name: auth_db
+      user: codelab_user
+      password: "secure-password"
+    secrets:
+      AUTH_SERVICE__MASTER_KEY: "production-master-key"
+  
+  agentRuntime:
+    database:
+      type: postgres
+      useInternal: false
+      host: external-postgres.example.com
+      port: 5432
+      name: agent_runtime
+      user: codelab_user
+      password: "secure-password"
+  
+  postgres:
+    enabled: false  # Используем внешнюю БД
+
+resources:
+  gateway:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+  
+  authService:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+```
+
+Установка с production конфигурацией:
+
+```bash
+helm install codelab . -n codelab -f production-values.yaml
+```
+
+### 4. Проверка развертывания
+
+```bash
+# Проверить статус подов
+kubectl get pods -n codelab
+
+# Проверить сервисы
+kubectl get svc -n codelab
+
+# Проверить Ingress
+kubectl get ingress -n codelab
+
+# Проверить логи auth-service
+kubectl logs -n codelab -l app.kubernetes.io/component=auth-service -f
+```
+
+### 5. Настройка TLS
+
+Для включения HTTPS создайте TLS сертификат:
+
+```bash
+# Используя cert-manager (рекомендуется)
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: codelab-tls
+  namespace: codelab
+spec:
+  secretName: codelab-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - codelab.yourdomain.com
+EOF
+```
+
+### 6. Обновление chart
+
+```bash
+# Обновить релиз
+helm upgrade codelab . -n codelab -f production-values.yaml
+
+# Откатить к предыдущей версии
+helm rollback codelab -n codelab
+```
+
+### 7. Удаление
+
+```bash
+# Удалить релиз
+helm uninstall codelab -n codelab
+
+# Удалить PVC (опционально)
+kubectl delete pvc -n codelab -l app.kubernetes.io/instance=codelab
+```
+
+**Подробнее**: См. [`codelab-chart/README.md`](../../codelab-chart/README.md) для полной документации Helm chart.
+
 ## Установка локальной LLM (опционально)
 
 Если вы хотите использовать локальные модели через Ollama:
@@ -236,8 +403,9 @@ uv pip install -e '.[dev]'
 После успешной установки:
 
 1. Ознакомьтесь с [Быстрым стартом](/docs/getting-started/quick-start)
-2. Изучите [Архитектуру проекта](/docs/architecture/overview)
-3. Прочитайте [Руководство по разработке](/docs/development/ide)
+2. Изучите [Auth Service API](/docs/api/auth-service) - Аутентификация
+3. Изучите [Архитектуру проекта](/docs/architecture/overview)
+4. Прочитайте [Руководство по разработке](/docs/development/ide)
 
 ## Дополнительные ресурсы
 

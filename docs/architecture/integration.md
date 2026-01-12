@@ -21,6 +21,11 @@ flowchart TB
         REDIS[(Redis<br/>Sessions)]
     end
     
+    subgraph "Auth Layer"
+        AUTH[Auth Service<br/>OAuth2 Server]
+        AUTH_DB[(PostgreSQL<br/>Users & Tokens)]
+    end
+    
     subgraph "AI Layer"
         AR[Agent Runtime<br/>AI Orchestration]
         LP[LLM Proxy<br/>LLM Access]
@@ -31,9 +36,13 @@ flowchart TB
         LLM[LLM Providers<br/>OpenAI/Anthropic/Ollama]
     end
     
-    IDE <-->|WebSocket| GW
+    IDE -->|OAuth2| AUTH
+    IDE <-->|WebSocket + JWT| GW
     IDE <-->|Local| FS
     IDE <-->|Process| GIT
+    AUTH <-->|JWT Validation| GW
+    AUTH <-->|Store| AUTH_DB
+    AUTH <-->|Cache| REDIS
     GW <-->|HTTP/SSE| AR
     GW <-->|Cache| REDIS
     AR <-->|HTTP/SSE| LP
@@ -170,7 +179,81 @@ response = await acompletion(
 
 ## Сценарии интеграции
 
-### Сценарий 1: Простой диалог
+### Сценарий 1: Аутентификация пользователя
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant IDE
+    participant Auth
+    participant Gateway
+    
+    User->>IDE: Запуск приложения
+    IDE->>IDE: Проверка сохраненных токенов
+    
+    alt Токены отсутствуют или истекли
+        IDE->>User: Показать форму входа
+        User->>IDE: Ввод username/password
+        IDE->>Auth: POST /oauth/token (password grant)
+        Auth->>Auth: Валидация credentials
+        Auth->>Auth: Проверка brute-force
+        Auth->>Auth: Генерация JWT токенов
+        Auth-->>IDE: access_token + refresh_token
+        IDE->>IDE: Сохранить токены
+    end
+    
+    IDE->>Gateway: WebSocket connect + JWT
+    Gateway->>Auth: GET /.well-known/jwks.json
+    Auth-->>Gateway: Public keys
+    Gateway->>Gateway: Валидация JWT
+    Gateway-->>IDE: Connection established
+    
+    Note over IDE,Gateway: Пользователь аутентифицирован
+```
+
+**Шаги**:
+1. Пользователь запускает IDE
+2. IDE проверяет наличие сохраненных токенов
+3. Если токены отсутствуют - показывается форма входа
+4. IDE отправляет credentials в Auth Service (OAuth2 Password Grant)
+5. Auth Service валидирует пользователя и генерирует JWT токены
+6. IDE сохраняет токены и подключается к Gateway с JWT
+7. Gateway валидирует JWT через JWKS endpoint
+8. Соединение установлено
+
+### Сценарий 2: Обновление токена
+
+```mermaid
+sequenceDiagram
+    participant IDE
+    participant Auth
+    participant Gateway
+    
+    IDE->>Gateway: WebSocket message + JWT
+    Gateway->>Gateway: Валидация JWT
+    Gateway-->>IDE: Error: Token expired
+    
+    IDE->>Auth: POST /oauth/token (refresh_token grant)
+    Auth->>Auth: Валидация refresh token
+    Auth->>Auth: Ротация refresh token
+    Auth-->>IDE: new access_token + new refresh_token
+    
+    IDE->>IDE: Обновить сохраненные токены
+    IDE->>Gateway: Retry with new JWT
+    Gateway->>Gateway: Валидация нового JWT
+    Gateway-->>IDE: Success
+```
+
+**Шаги**:
+1. IDE отправляет сообщение с истекшим access token
+2. Gateway возвращает ошибку "Token expired"
+3. IDE использует refresh token для получения новых токенов
+4. Auth Service валидирует refresh token и выполняет ротацию
+5. IDE получает новые access и refresh токены
+6. IDE повторяет запрос с новым access token
+7. Запрос успешно обработан
+
+### Сценарий 3: Простой диалог
 
 ```mermaid
 sequenceDiagram
@@ -196,14 +279,14 @@ sequenceDiagram
 
 **Шаги**:
 1. Пользователь вводит сообщение в IDE
-2. IDE отправляет через WebSocket в Gateway
-3. Gateway пересылает в Agent Runtime
+2. IDE отправляет через WebSocket в Gateway (с JWT токеном)
+3. Gateway валидирует JWT и пересылает в Agent Runtime
 4. Agent добавляет в контекст и запрашивает LLM
 5. LLM Proxy вызывает OpenAI API
 6. Токены стримятся обратно через всю цепочку
 7. IDE отображает ответ пользователю
 
-### Сценарий 2: Выполнение tool-call
+### Сценарий 4: Выполнение tool-call
 
 ```mermaid
 sequenceDiagram
@@ -232,13 +315,13 @@ sequenceDiagram
 **Шаги**:
 1. Пользователь просит прочитать файл
 2. LLM решает использовать tool `read_file`
-3. Agent отправляет `tool_call` в IDE
+3. Agent отправляет `tool_call` в IDE (через Gateway)
 4. IDE выполняет чтение файла локально
 5. IDE отправляет `tool_result` обратно
 6. Agent продолжает диалог с результатом
 7. Финальный ответ стримится пользователю
 
-### Сценарий 3: HITL (Human-in-the-Loop)
+### Сценарий 5: HITL (Human-in-the-Loop)
 
 ```mermaid
 sequenceDiagram
@@ -456,6 +539,52 @@ class FileChangeHandler:
 ```
 
 ## Безопасность интеграции
+
+### JWT Authentication Flow
+
+```python
+# IDE → Gateway: WebSocket с JWT
+class WebSocketHandler:
+    async def connect(self, websocket: WebSocket, token: str):
+        # Валидация JWT через JWKS
+        try:
+            payload = await self.jwt_validator.validate_token(token)
+            user_id = payload["sub"]
+            
+            # Создание сессии
+            session = await self.session_manager.create_session(
+                user_id=user_id,
+                connection=websocket,
+            )
+            
+            await websocket.accept()
+        except InvalidTokenError:
+            await websocket.close(code=4001, reason="Invalid token")
+```
+
+### Auth Service → Gateway: JWKS Validation
+
+```python
+# Gateway получает публичные ключи от Auth Service
+class JWKSClient:
+    def __init__(self, auth_service_url: str):
+        self.jwks_url = f"{auth_service_url}/.well-known/jwks.json"
+        self.cache = None
+        self.cache_ttl = 3600  # 1 час
+    
+    async def get_public_keys(self) -> dict:
+        # Проверка кеша
+        if self.cache and not self._is_cache_expired():
+            return self.cache
+        
+        # Запрос к Auth Service
+        async with httpx.AsyncClient() as client:
+            response = await client.get(self.jwks_url)
+            self.cache = response.json()
+            self.cache_time = time.time()
+        
+        return self.cache
+```
 
 ### Internal Authentication
 

@@ -14,6 +14,7 @@ AI Service состоит из трех основных микросервис�
 flowchart TB
     subgraph "AI Service Layer"
         GW[Gateway Service<br/>Port: 8000]
+        AUTH[Auth Service<br/>Port: 8003]
         AR[Agent Runtime<br/>Port: 8001]
         LP[LLM Proxy<br/>Port: 8002]
     end
@@ -29,14 +30,18 @@ flowchart TB
         REDIS[(Redis)]
     end
     
-    IDE[CodeLab IDE] <-->|WebSocket| GW
+    IDE[CodeLab IDE] -->|OAuth2| AUTH
+    IDE[CodeLab IDE] <-->|WebSocket + JWT| GW
+    AUTH <-->|JWT Validation| GW
     GW <-->|HTTP/SSE| AR
     AR <-->|HTTP/SSE| LP
     LP --> OAI
     LP --> ANT
     LP --> OLL
     AR --> PG
+    AUTH --> PG
     GW --> REDIS
+    AUTH --> REDIS
 ```
 
 ## Микросервисы
@@ -339,6 +344,246 @@ class LLMService:
         
         # Сохранить в кеш
         await self.cache.set(cache_key, full_response, ttl=3600)
+```
+
+### 4. Auth Service
+
+**Назначение**: OAuth2 Authorization Server для аутентификации и авторизации пользователей.
+
+**Технологии**:
+- Python 3.12+
+- FastAPI
+- SQLAlchemy (async)
+- PostgreSQL/SQLite
+- Redis (rate limiting и кеширование)
+- bcrypt (хеширование паролей)
+- python-jose (JWT токены)
+
+**Структура**:
+```
+auth-service/
+├── app/
+│   ├── main.py                    # Точка входа
+│   ├── api/
+│   │   └── v1/
+│   │       ├── oauth.py           # OAuth2 endpoints
+│   │       └── jwks.py            # JWKS endpoint
+│   ├── core/
+│   │   ├── config.py              # Конфигурация
+│   │   ├── security.py            # RSA ключи, JWT
+│   │   └── seed.py                # Seed данные
+│   ├── middleware/
+│   │   ├── logging.py             # Structured logging
+│   │   └── rate_limit.py          # Rate limiting
+│   ├── models/
+│   │   ├── user.py                # Модель пользователя
+│   │   ├── oauth_client.py        # OAuth клиенты
+│   │   ├── refresh_token.py       # Refresh токены
+│   │   └── audit_log.py           # Аудит логи
+│   ├── schemas/
+│   │   ├── oauth.py               # OAuth схемы
+│   │   ├── token.py               # Token схемы
+│   │   └── user.py                # User схемы
+│   ├── services/
+│   │   ├── auth_service.py        # Аутентификация
+│   │   ├── token_service.py       # Генерация JWT
+│   │   ├── user_service.py        # Управление пользователями
+│   │   ├── oauth_client_service.py # OAuth клиенты
+│   │   ├── refresh_token_service.py # Refresh токены
+│   │   ├── brute_force_protection.py # Защита от brute-force
+│   │   ├── rate_limiter.py        # Rate limiting
+│   │   ├── audit_service.py       # Аудит логирование
+│   │   └── jwks_service.py        # JWKS генерация
+│   └── utils/
+│       ├── crypto.py              # Криптографические утилиты
+│       └── validators.py          # Валидаторы
+├── alembic/                       # DB migrations
+├── scripts/
+│   ├── generate_keys.py           # Генерация RSA ключей
+│   └── init_db.py                 # Инициализация БД
+├── Dockerfile
+└── pyproject.toml
+```
+
+**Ключевые функции**:
+
+1. **OAuth2 Password Grant**
+   - Аутентификация по username/password
+   - Выдача access и refresh токенов
+   - Поддержка scopes
+
+2. **Refresh Token Grant**
+   - Обновление access токенов
+   - Автоматическая ротация refresh токенов
+   - Одноразовое использование
+
+3. **JWT Токены (RS256)**
+   - Access Token: 15 минут
+   - Refresh Token: 30 дней
+   - Подпись RSA приватным ключом
+   - Валидация через JWKS endpoint
+
+4. **JWKS Endpoint**
+   - Публичные ключи для валидации JWT
+   - Кеширование в Redis (TTL 1 час)
+   - Поддержка key rotation
+
+5. **Security Features**
+   - Brute-force protection (5 попыток, lockout 15 минут)
+   - Rate limiting (IP-based и username-based)
+   - Audit logging всех операций
+   - Безопасное хранение паролей (bcrypt)
+
+6. **Database Schema**
+   ```sql
+   -- Пользователи
+   CREATE TABLE users (
+       id UUID PRIMARY KEY,
+       username VARCHAR(255) UNIQUE NOT NULL,
+       email VARCHAR(255) UNIQUE NOT NULL,
+       password_hash VARCHAR(255) NOT NULL,
+       is_active BOOLEAN DEFAULT TRUE,
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   
+   -- OAuth клиенты
+   CREATE TABLE oauth_clients (
+       id UUID PRIMARY KEY,
+       client_id VARCHAR(255) UNIQUE NOT NULL,
+       client_secret_hash VARCHAR(255),
+       client_type VARCHAR(50),  -- public, confidential
+       allowed_scopes TEXT,
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   
+   -- Refresh токены
+   CREATE TABLE refresh_tokens (
+       id UUID PRIMARY KEY,
+       token_hash VARCHAR(255) UNIQUE NOT NULL,
+       user_id UUID REFERENCES users(id),
+       client_id VARCHAR(255),
+       expires_at TIMESTAMP NOT NULL,
+       is_revoked BOOLEAN DEFAULT FALSE,
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   
+   -- Аудит логи
+   CREATE TABLE audit_logs (
+       id UUID PRIMARY KEY,
+       user_id UUID,
+       action VARCHAR(255),
+       ip_address VARCHAR(45),
+       user_agent TEXT,
+       success BOOLEAN,
+       details JSONB,
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   ```
+
+**Пример кода**:
+```python
+from app.services.auth_service import AuthService
+from app.services.token_service import TokenService
+
+class AuthService:
+    def __init__(
+        self,
+        user_service: UserService,
+        token_service: TokenService,
+        brute_force_protection: BruteForceProtection,
+        audit_service: AuditService,
+    ):
+        self.users = user_service
+        self.tokens = token_service
+        self.brute_force = brute_force_protection
+        self.audit = audit_service
+    
+    async def authenticate(
+        self,
+        username: str,
+        password: str,
+        client_id: str,
+        scope: str,
+        ip_address: str,
+    ) -> TokenResponse:
+        # Проверка brute-force
+        await self.brute_force.check_lockout(username, ip_address)
+        
+        # Аутентификация
+        user = await self.users.authenticate(username, password)
+        if not user:
+            await self.brute_force.record_failed_attempt(username, ip_address)
+            await self.audit.log_failed_login(username, ip_address)
+            raise InvalidCredentialsError()
+        
+        # Сброс счетчика неудачных попыток
+        await self.brute_force.reset_attempts(username, ip_address)
+        
+        # Генерация токенов
+        access_token = await self.tokens.create_access_token(
+            user_id=user.id,
+            scope=scope,
+        )
+        refresh_token = await self.tokens.create_refresh_token(
+            user_id=user.id,
+            client_id=client_id,
+        )
+        
+        # Аудит
+        await self.audit.log_successful_login(user.id, ip_address)
+        
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=900,
+            scope=scope,
+        )
+```
+
+**Интеграция с Gateway**:
+```python
+# Gateway валидирует JWT токены через JWKS
+from jose import jwt, jwk
+import httpx
+
+class JWTValidator:
+    def __init__(self, jwks_url: str):
+        self.jwks_url = jwks_url
+        self.jwks_cache = None
+    
+    async def get_jwks(self) -> dict:
+        if not self.jwks_cache:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(self.jwks_url)
+                self.jwks_cache = response.json()
+        return self.jwks_cache
+    
+    async def validate_token(self, token: str) -> dict:
+        jwks = await self.get_jwks()
+        
+        # Декодировать header для получения kid
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get("kid")
+        
+        # Найти соответствующий ключ
+        key = next(
+            (k for k in jwks["keys"] if k["kid"] == kid),
+            None
+        )
+        if not key:
+            raise InvalidTokenError("Key not found")
+        
+        # Валидация токена
+        payload = jwt.decode(
+            token,
+            key,
+            algorithms=["RS256"],
+            audience="codelab-api",
+            issuer="https://auth.codelab.local",
+        )
+        
+        return payload
 ```
 
 ## Поток данных
@@ -714,6 +959,7 @@ server {
 
 ## Следующие шаги
 
+- [Мультиагентная система](/docs/api/multi-agent-system) - Полная документация мультиагентной системы
 - [Интеграция компонентов](/docs/architecture/integration)
 - [Разработка AI Service](/docs/development/ai-service)
 - [Gateway API](/docs/api/gateway)

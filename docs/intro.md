@@ -22,7 +22,8 @@ slug: /
 - ✅ **Модульная архитектура** - Чистое разделение ответственности
 
 ### AI Service (Python)
-- ✅ **Микросервисная архитектура** - Gateway, Agent Runtime, LLM Proxy
+- ✅ **Микросервисная архитектура** - Gateway, Auth Service, Agent Runtime, LLM Proxy
+- ✅ **OAuth2 аутентификация** - Безопасная аутентификация с JWT токенами
 - ✅ **Поддержка множества LLM** - OpenAI, Anthropic, Ollama (локальные модели)
 - ✅ **WebSocket API** - Потоковая передача данных в реальном времени
 - ✅ **Управление контекстом** - Сохранение истории диалогов
@@ -45,6 +46,7 @@ codelab-workspace/
 │   └── packages/             # Модульные пакеты
 ├── codelab-ai-service/       # AI сервис (микросервисы)
 │   ├── gateway/              # WebSocket прокси
+│   ├── auth-service/         # OAuth2 Authorization Server
 │   ├── agent-runtime/        # AI логика и оркестрация
 │   └── llm-proxy/            # Унифицированный доступ к LLM
 └── doc/                      # Документация проекта
@@ -57,9 +59,14 @@ CodeLab построен на микросервисной архитектур�
 ```
 ┌─────────────────┐
 │   CodeLab IDE   │  (Flutter Desktop)
-└────────┬────────┘
-         │ WebSocket
-         ↓
+└────┬────────┬───┘
+     │        │ OAuth2
+     │        ↓
+     │   ┌─────────────────┐
+     │   │  Auth Service   │  (JWT Tokens)
+     │   └─────────────────┘
+     │ WebSocket + JWT
+     ↓
 ┌─────────────────┐
 │    Gateway      │  (WebSocket Proxy)
 └────────┬────────┘
@@ -92,6 +99,7 @@ CodeLab построен на микросервисной архитектур�
 - [Тестирование](/docs/development/testing) - Запуск тестов
 
 ### API и протоколы
+- [Auth Service API](/docs/api/auth-service) - OAuth2 аутентификация
 - [WebSocket Protocol](/docs/api/websocket-protocol) - Протокол взаимодействия
 - [Agent Protocol](/docs/api/agent-protocol) - Расширенный протокол агента
 - [Tools Specification](/docs/api/tools-specification) - Спецификация инструментов

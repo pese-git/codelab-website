@@ -18,6 +18,10 @@ flowchart TB
         GW[Gateway Service<br/>WebSocket Proxy<br/>Port: 8000]
     end
     
+    subgraph "Auth Layer"
+        AUTH[Auth Service<br/>OAuth2 Server<br/>Port: 8003]
+    end
+    
     subgraph "AI Layer"
         AR[Agent Runtime<br/>AI Logic & Orchestration<br/>Port: 8001]
         LP[LLM Proxy<br/>Unified LLM Access<br/>Port: 8002]
@@ -29,7 +33,9 @@ flowchart TB
         OLL[Ollama<br/>Local Models]
     end
     
-    IDE <-->|WebSocket| GW
+    IDE -->|OAuth2| AUTH
+    IDE <-->|WebSocket + JWT| GW
+    AUTH <-->|JWT Validation| GW
     GW <-->|HTTP/SSE| AR
     AR <-->|HTTP/SSE| LP
     LP --> OAI
@@ -107,6 +113,28 @@ flowchart TB
 - Кеширование запросов
 
 **Подробнее**: [API LLM Proxy](/docs/api/llm-proxy)
+
+### 5. Auth Service
+
+**Назначение**: OAuth2 Authorization Server для аутентификации и авторизации.
+
+**Технологии**:
+- Python 3.12+
+- FastAPI
+- SQLAlchemy (async)
+- PostgreSQL/SQLite
+- Redis (rate limiting)
+
+**Функции**:
+- OAuth2 Password Grant
+- Refresh Token Grant с ротацией
+- JWT токены (RS256)
+- JWKS endpoint для валидации
+- Brute-force protection
+- Rate limiting
+- Audit logging
+
+**Подробнее**: [API Auth Service](/docs/api/auth-service)
 
 ## Поток данных
 
@@ -278,9 +306,12 @@ abstract class ProjectRepository {
 
 ### Аутентификация
 
-- JWT токены для API
-- Session-based для WebSocket
-- API ключи для LLM провайдеров
+- **OAuth2 Password Grant**: Аутентификация пользователей через Auth Service
+- **JWT токены (RS256)**: Access токены для API (15 минут)
+- **Refresh Token Grant**: Обновление токенов с автоматической ротацией (30 дней)
+- **JWKS endpoint**: Публичные ключи для валидации JWT
+- **Session-based**: Для WebSocket соединений
+- **API ключи**: Для LLM провайдеров
 
 ### Авторизация
 
@@ -368,6 +399,7 @@ cd codelab-ai-service && docker compose up -d
 | Python | 3.12+ | Язык программирования |
 | FastAPI | 0.100+ | Web Framework |
 | PostgreSQL | 15+ | База данных |
+| Redis | 7+ | Кеширование, Rate Limiting |
 | Docker | 20.10+ | Контейнеризация |
 
 ## Следующие шаги

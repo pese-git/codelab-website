@@ -56,6 +56,10 @@ cd codelab-workspace/codelab-ai-service
 cd gateway
 uv sync
 
+# Auth Service
+cd ../auth-service
+uv sync
+
 # Agent Runtime
 cd ../agent-runtime
 uv sync
@@ -70,10 +74,28 @@ uv sync
 ```bash
 # Скопировать примеры
 cp gateway/.env.example gateway/.env
+cp auth-service/.env.example auth-service/.env
 cp agent-runtime/.env.example agent-runtime/.env
 cp llm-proxy/.env.example llm-proxy/.env
 
 # Отредактировать .env файлы
+```
+
+### 5. Генерация RSA ключей для Auth Service
+
+```bash
+cd auth-service
+
+# Создать директорию для ключей
+mkdir -p keys
+
+# Сгенерировать ключи
+python scripts/generate_keys.py --output-dir ./keys
+
+# Проверить созданные ключи
+ls -la keys/
+# private_key.pem
+# public_key.pem
 ```
 
 ## Структура проекта
@@ -86,6 +108,19 @@ codelab-ai-service/
 │   │   ├── api/
 │   │   ├── services/
 │   │   └── models/
+│   ├── tests/
+│   ├── Dockerfile
+│   └── pyproject.toml
+│
+├── auth-service/             # OAuth2 Authorization Server
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── api/
+│   │   ├── services/
+│   │   ├── models/
+│   │   └── middleware/
+│   ├── alembic/             # DB migrations
+│   ├── scripts/             # Утилиты
 │   ├── tests/
 │   ├── Dockerfile
 │   └── pyproject.toml
@@ -132,16 +167,20 @@ docker compose down
 # Запустить PostgreSQL и Redis
 docker compose up -d postgres redis
 
+# Auth Service
+cd auth-service
+uv run uvicorn app.main:app --reload --port 8003
+
 # Gateway
-cd gateway
+cd ../gateway
 uv run uvicorn app.main:app --reload --port 8000
 
 # Agent Runtime
-cd agent-runtime
+cd ../agent-runtime
 uv run uvicorn app.main:app --reload --port 8001
 
 # LLM Proxy
-cd llm-proxy
+cd ../llm-proxy
 uv run uvicorn app.main:app --reload --port 8002
 ```
 
@@ -216,16 +255,15 @@ class Conversation(Base):
 ### 5. Создание миграции
 
 ```bash
+# Для Agent Runtime
 cd agent-runtime
-
-# Создать миграцию
 alembic revision --autogenerate -m "Add new table"
-
-# Применить миграцию
 alembic upgrade head
 
-# Откатить миграцию
-alembic downgrade -1
+# Для Auth Service
+cd ../auth-service
+alembic revision --autogenerate -m "Add new table"
+alembic upgrade head
 ```
 
 ## Тестирование
@@ -339,6 +377,7 @@ docker compose logs -f
 
 # Конкретный сервис
 docker compose logs -f gateway
+docker compose logs -f auth-service
 
 # Последние N строк
 docker compose logs --tail=100 gateway
@@ -579,8 +618,75 @@ alembic upgrade head
 - [LiteLLM Documentation](https://docs.litellm.ai/)
 - [Docker Documentation](https://docs.docker.com/)
 
+## Работа с Auth Service
+
+### Создание пользователя
+
+```bash
+# Через Docker
+docker compose exec auth-service python -c "
+from app.services.user_service import UserService
+from app.models.database import get_session
+import asyncio
+
+async def create_user():
+    async with get_session() as session:
+        user_service = UserService(session)
+        user = await user_service.create_user(
+            username='newuser',
+            email='newuser@example.com',
+            password='SecurePass123!@#'
+        )
+        print(f'User created: {user.email}')
+
+asyncio.run(create_user())
+"
+```
+
+### Тестирование OAuth2 flow
+
+```bash
+# Получить токены
+curl -X POST http://localhost:8003/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "username=test@codelab.local" \
+  -d "password=Test123!@#" \
+  -d "client_id=codelab-flutter-app" \
+  -d "scope=api:read api:write"
+
+# Проверить JWKS
+curl http://localhost:8003/.well-known/jwks.json
+```
+
+### Валидация JWT токена
+
+```python
+from jose import jwt
+import httpx
+
+async def validate_token(token: str):
+    # Получить JWKS
+    async with httpx.AsyncClient() as client:
+        response = await client.get("http://localhost:8003/.well-known/jwks.json")
+        jwks = response.json()
+    
+    # Валидация
+    payload = jwt.decode(
+        token,
+        jwks["keys"][0],
+        algorithms=["RS256"],
+        audience="codelab-api",
+        issuer="https://auth.codelab.local",
+    )
+    
+    print(f"User ID: {payload['sub']}")
+    print(f"Scopes: {payload['scope']}")
+```
+
 ## Следующие шаги
 
+- [Auth Service API](/docs/api/auth-service) - Документация Auth Service
 - [Участие в проекте](/docs/development/contributing)
 - [Тестирование](/docs/development/testing)
 - [Архитектура AI Service](/docs/architecture/ai-service-architecture)

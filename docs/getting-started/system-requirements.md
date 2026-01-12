@@ -113,6 +113,7 @@ CodeLab также работает на других дистрибутивах
 | Gateway | 8000 | HTTP/WebSocket | WebSocket прокси |
 | Agent Runtime | 8001 | HTTP | AI логика |
 | LLM Proxy | 8002 | HTTP | Доступ к LLM |
+| Auth Service | 8003 | HTTP | OAuth2 аутентификация |
 | Ollama (опционально) | 11434 | HTTP | Локальные модели |
 
 ### Интернет-соединение
@@ -233,6 +234,7 @@ Get-CimInstance Win32_Processor
 lsof -i :8000
 lsof -i :8001
 lsof -i :8002
+lsof -i :8003
 ```
 
 **Windows (PowerShell):**
@@ -241,6 +243,7 @@ lsof -i :8002
 netstat -ano | findstr :8000
 netstat -ano | findstr :8001
 netstat -ano | findstr :8002
+netstat -ano | findstr :8003
 ```
 
 ## Рекомендации по производительности

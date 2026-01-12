@@ -61,10 +61,11 @@ docker compose up -d
 docker compose ps
 ```
 
-Вы должны увидеть 3 запущенных сервиса:
+Вы должны увидеть 4 запущенных сервиса:
 - `gateway` (порт 8000)
 - `agent-runtime` (порт 8001)
 - `llm-proxy` (порт 8002)
+- `auth-service` (порт 8003)
 
 ### 2. Проверка работоспособности
 
@@ -77,30 +78,66 @@ curl http://localhost:8001/health
 
 # Проверить LLM Proxy
 curl http://localhost:8002/health
+
+# Проверить Auth Service
+curl http://localhost:8003/health
 ```
+
+### 3. Создание тестового пользователя
+
+Для работы с AI Assistant необходимо создать пользователя:
+
+```bash
+# Войти в контейнер auth-service
+docker compose exec auth-service python -c "
+from app.core.seed import seed_default_data
+import asyncio
+asyncio.run(seed_default_data())
+"
+```
+
+Будет создан тестовый пользователь:
+- **Email**: `test@codelab.local`
+- **Password**: `Test123!@#`
+
+**Важно**: В production окружении измените пароль!
 
 ## Настройка AI Ассистента в IDE
 
-### 1. Открытие настроек
+### 1. Аутентификация
+
+При первом запуске IDE вам будет предложено войти в систему.
+
+**Введите учетные данные:**
+- **Email**: `test@codelab.local`
+- **Password**: `Test123!@#`
+
+IDE автоматически:
+1. Получит JWT токены от Auth Service
+2. Сохранит токены локально
+3. Подключится к Gateway с JWT токеном
+
+### 2. Открытие настроек
 
 В IDE:
 1. Нажмите на иконку настроек (⚙️) в правой панели
 2. Или используйте меню: `Settings` → `AI Assistant`
 
-### 2. Настройка подключения
+### 3. Настройка подключения
 
-Введите следующие параметры:
+Параметры подключения (обычно настроены по умолчанию):
 
 ```
+Auth Service URL: http://localhost:8003
 Gateway URL: ws://localhost:8000/ws
-Session ID: (оставьте пустым для автогенерации)
+Session ID: (автогенерируется)
 ```
 
-### 3. Проверка подключения
+### 4. Проверка подключения
 
 1. Нажмите кнопку `Test Connection`
 2. Если подключение успешно, вы увидите зеленую галочку
-3. Нажмите `Save` для сохранения настроек
+3. Токены автоматически обновляются при истечении (каждые 15 минут)
 
 ## Первый запрос к AI
 
@@ -260,6 +297,7 @@ docker compose logs -f
 
 # Конкретный сервис
 docker compose logs -f gateway
+docker compose logs -f auth-service
 docker compose logs -f agent-runtime
 docker compose logs -f llm-proxy
 ```
@@ -310,6 +348,38 @@ cd codelab-ai-service
 
 ## Устранение проблем
 
+### Ошибка аутентификации
+
+1. Проверьте Auth Service:
+   ```bash
+   curl http://localhost:8003/health
+   ```
+
+2. Проверьте логи Auth Service:
+   ```bash
+   docker compose logs auth-service
+   ```
+
+3. Убедитесь, что пользователь создан:
+   ```bash
+   docker compose exec auth-service python -c "
+   from app.models.database import get_session
+   from app.models.user import User
+   import asyncio
+   
+   async def check_user():
+       async with get_session() as session:
+           from sqlalchemy import select
+           result = await session.execute(select(User))
+           users = result.scalars().all()
+           print(f'Users: {len(users)}')
+           for user in users:
+               print(f'  - {user.email}')
+   
+   asyncio.run(check_user())
+   "
+   ```
+
 ### AI не отвечает
 
 1. Проверьте подключение к Gateway:
@@ -317,12 +387,15 @@ cd codelab-ai-service
    curl http://localhost:8000/health
    ```
 
-2. Проверьте логи:
+2. Проверьте, что токен валиден (в IDE должна быть зеленая галочка подключения)
+
+3. Проверьте логи:
    ```bash
    docker compose logs gateway
+   docker compose logs auth-service
    ```
 
-3. Перезапустите сервисы:
+4. Перезапустите сервисы:
    ```bash
    docker compose restart
    ```
@@ -347,10 +420,11 @@ cd codelab-ai-service
 
 Теперь, когда вы настроили CodeLab:
 
-1. Изучите [Архитектуру проекта](/docs/architecture/overview)
-2. Ознакомьтесь с [Руководством по разработке](/docs/development/ide)
-3. Изучите [API и протоколы](/docs/api/websocket-protocol)
-4. Присоединяйтесь к разработке: [Contributing Guide](/docs/development/contributing)
+1. Изучите [Auth Service API](/docs/api/auth-service) - Подробнее об аутентификации
+2. Изучите [Архитектуру проекта](/docs/architecture/overview)
+3. Ознакомьтесь с [Руководством по разработке](/docs/development/ide)
+4. Изучите [API и протоколы](/docs/api/websocket-protocol)
+5. Присоединяйтесь к разработке: [Contributing Guide](/docs/development/contributing)
 
 ## Полезные ссылки
 

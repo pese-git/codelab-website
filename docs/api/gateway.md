@@ -12,6 +12,20 @@ API документация для Gateway Service - WebSocket прокси м�
 - **WebSocket URL**: `ws://localhost:8000`
 - **Версия API**: v1
 
+## Аутентификация
+
+Gateway Service использует JWT токены для аутентификации WebSocket соединений.
+
+**Получение токенов:**
+1. Аутентифицируйтесь через Auth Service (см. [Auth Service API](/docs/api/auth-service))
+2. Получите `access_token` и `refresh_token`
+3. Передайте `access_token` в заголовке `Authorization` при подключении
+
+**Формат токена:**
+- Тип: Bearer JWT (RS256)
+- Время жизни: 15 минут
+- Валидация: Через JWKS endpoint Auth Service
+
 ## WebSocket Endpoints
 
 ### Подключение к сессии
@@ -23,9 +37,19 @@ ws://localhost:8000/ws/{session_id}
 **Параметры:**
 - `session_id` (string, required): Уникальный идентификатор сессии
 
-**Пример:**
+**Headers:**
+- `Authorization` (string, required): `Bearer {access_token}`
+
+**Пример (JavaScript с библиотекой):**
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/user_session_123');
+const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+// Используя библиотеку, поддерживающую headers
+const ws = new WebSocket('ws://localhost:8000/ws/user_session_123', {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+});
 
 ws.onopen = () => {
   console.log('Connected');
@@ -35,6 +59,21 @@ ws.onmessage = (event) => {
   const message = JSON.parse(event.data);
   console.log('Received:', message);
 };
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+```
+
+**Dart/Flutter пример:**
+```dart
+final accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...';
+final channel = WebSocketChannel.connect(
+  Uri.parse('ws://localhost:8000/ws/session_123'),
+  headers: {
+    'Authorization': 'Bearer $accessToken',
+  },
+);
 ```
 
 ## REST Endpoints
@@ -148,6 +187,20 @@ messages_processed_total{service="gateway",status="success"} 1234
 }
 ```
 
+#### token_expired
+
+```json
+{
+  "type": "error",
+  "content": "JWT token has expired",
+  "error_code": "TOKEN_EXPIRED"
+}
+```
+
+При получении этой ошибки IDE должна:
+1. Использовать refresh token для получения нового access token
+2. Переподключиться с новым токеном
+
 ## Конфигурация
 
 ### Переменные окружения
@@ -163,9 +216,10 @@ AGENT_RUNTIME_URL=http://agent-runtime:8001
 # Redis
 REDIS_URL=redis://redis:6379/0
 
-# Auth
-JWT_SECRET=your-secret-key
-JWT_ALGORITHM=HS256
+# Auth Service
+AUTH_SERVICE_URL=http://auth-service:8003
+JWKS_URL=http://auth-service:8003/.well-known/jwks.json
+JWKS_CACHE_TTL=3600
 
 # Logging
 LOG_LEVEL=INFO
@@ -180,6 +234,8 @@ LOG_LEVEL=INFO
 | `INVALID_MESSAGE` | 400 | Некорректный формат сообщения |
 | `SESSION_NOT_FOUND` | 404 | Сессия не найдена |
 | `SESSION_EXPIRED` | 401 | Сессия истекла |
+| `TOKEN_EXPIRED` | 401 | JWT токен истек |
+| `TOKEN_INVALID` | 401 | Некорректный JWT токен |
 | `UNAUTHORIZED` | 401 | Не авторизован |
 | `AGENT_UNAVAILABLE` | 503 | Agent Runtime недоступен |
 | `INTERNAL_ERROR` | 500 | Внутренняя ошибка |
@@ -215,8 +271,44 @@ Gateway применяет rate limiting для защиты от злоупот
 }
 ```
 
+## Обработка истечения токена
+
+Когда access token истекает (через 15 минут), Gateway возвращает ошибку:
+
+```json
+{
+  "type": "error",
+  "error_code": "TOKEN_EXPIRED",
+  "message": "JWT token has expired"
+}
+```
+
+**Рекомендуемый flow:**
+
+1. IDE получает ошибку `TOKEN_EXPIRED`
+2. IDE использует refresh token для получения нового access token (см. [Auth Service API](/docs/api/auth-service))
+3. IDE закрывает текущее WebSocket соединение
+4. IDE переподключается с новым access token в заголовке Authorization
+5. IDE восстанавливает состояние сессии
+
+**Пример (JavaScript):**
+```javascript
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  
+  if (message.type === 'error' && message.error_code === 'TOKEN_EXPIRED') {
+    // Обновить токен
+    refreshAccessToken().then(newToken => {
+      // Переподключиться с новым токеном
+      reconnectWithNewToken(newToken);
+    });
+  }
+};
+```
+
 ## Следующие шаги
 
-- [WebSocket Protocol](/docs/api/websocket-protocol)
-- [Agent Protocol](/docs/api/agent-protocol)
-- [Agent Runtime API](/docs/api/agent-runtime)
+- [Auth Service API](/docs/api/auth-service) - Аутентификация и получение токенов
+- [WebSocket Protocol](/docs/api/websocket-protocol) - Детальная спецификация протокола
+- [Agent Protocol](/docs/api/agent-protocol) - Расширенный протокол агента
+- [Agent Runtime API](/docs/api/agent-runtime) - API Agent Runtime сервиса

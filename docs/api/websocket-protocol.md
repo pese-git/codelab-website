@@ -6,6 +6,20 @@ sidebar_position: 1
 
 Протокол WebSocket используется для взаимодействия между CodeLab IDE и Gateway Service. Он обеспечивает двунаправленную связь в реальном времени с поддержкой streaming токенов и tool-calls.
 
+## Аутентификация
+
+WebSocket соединения требуют JWT аутентификации через Auth Service.
+
+**Процесс аутентификации:**
+1. Получите JWT токены через Auth Service (см. [Auth Service API](/docs/api/auth-service))
+2. Передайте `access_token` в заголовке `Authorization: Bearer {token}` при подключении
+3. Gateway валидирует токен через JWKS endpoint Auth Service
+
+**Формат токена:**
+- Алгоритм: RS256
+- Время жизни: 15 минут
+- Обновление: Через refresh token
+
 ## Эндпоинт подключения
 
 ```
@@ -16,9 +30,14 @@ ws://<gateway_host>/ws/{session_id}
 - `gateway_host` - адрес Gateway сервиса (по умолчанию `localhost:8000`)
 - `session_id` - уникальный идентификатор сессии пользователя
 
+**Headers:**
+- `Authorization: Bearer {access_token}` - JWT токен из Auth Service
+
 **Пример:**
 ```
 ws://localhost:8000/ws/user_session_123
+Headers:
+  Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 ## Типы сообщений
@@ -125,13 +144,58 @@ ws://localhost:8000/ws/user_session_123
 ```json
 {
   "type": "error",
-  "content": "Invalid message format"
+  "content": "Invalid message format",
+  "error_code": "INVALID_FORMAT"
 }
 ```
 
 **Поля:**
 - `type` (string): `"error"`
 - `content` (string): Описание ошибки
+- `error_code` (string, опционально): Код ошибки
+
+**Коды ошибок аутентификации:**
+- `TOKEN_EXPIRED` - JWT токен истек (требуется обновление через refresh token)
+- `TOKEN_INVALID` - Некорректный JWT токен
+- `UNAUTHORIZED` - Отсутствует или неверный токен аутентификации
+
+### 6. Agent Switched (Gateway → IDE)
+
+Уведомление о переключении агента в мультиагентной системе.
+
+```json
+{
+  "type": "agent_switched",
+  "from_agent": "orchestrator",
+  "to_agent": "coder",
+  "reason": "User requested code implementation",
+  "timestamp": "2024-01-09T10:05:00Z"
+}
+```
+
+**Поля:**
+- `type` (string): `"agent_switched"`
+- `from_agent` (string): Предыдущий агент (`orchestrator`, `coder`, `architect`, `debug`, `ask`)
+- `to_agent` (string): Новый агент
+- `reason` (string): Причина переключения
+- `timestamp` (string): Время переключения (ISO 8601)
+
+### 7. Switch Agent (IDE → Gateway)
+
+Запрос на явное переключение агента.
+
+```json
+{
+  "type": "switch_agent",
+  "agent_type": "architect",
+  "content": "Спроектируй архитектуру системы"
+}
+```
+
+**Поля:**
+- `type` (string): `"switch_agent"`
+- `agent_type` (string): Тип агента (`orchestrator`, `coder`, `architect`, `debug`, `ask`)
+- `content` (string): Сообщение для нового агента
 
 ## HITL (Human-in-the-Loop)
 
@@ -414,6 +478,121 @@ sequenceDiagram
 }
 ```
 
+### Сценарий 6: Автоматическое переключение агента
+
+```mermaid
+sequenceDiagram
+    participant IDE
+    participant Gateway
+    participant Orchestrator
+    participant Coder
+    
+    IDE->>Gateway: user_message ("Создай виджет")
+    Gateway->>Orchestrator: Forward message
+    Orchestrator->>Orchestrator: Анализ запроса (LLM)
+    Orchestrator->>Coder: Переключение на Coder
+    Gateway-->>IDE: agent_switched (orchestrator → coder)
+    Coder->>Gateway: tool_call (write_file)
+    Gateway->>IDE: tool_call
+    IDE->>Gateway: tool_result
+    Gateway->>Coder: Forward result
+    Coder->>Gateway: assistant_message
+    Gateway->>IDE: assistant_message
+```
+
+**Пример:**
+
+1. IDE → Gateway:
+```json
+{
+  "type": "user_message",
+  "content": "Создай новый виджет профиля"
+}
+```
+
+2. Gateway → IDE (уведомление о переключении):
+```json
+{
+  "type": "agent_switched",
+  "from_agent": "orchestrator",
+  "to_agent": "coder",
+  "reason": "Task requires code implementation",
+  "timestamp": "2024-01-09T10:05:00Z"
+}
+```
+
+3. Gateway → IDE (ответ от Coder):
+```json
+{
+  "type": "assistant_message",
+  "token": "Создаю виджет профиля...",
+  "is_final": false
+}
+```
+
+4. Gateway → IDE (tool call):
+```json
+{
+  "type": "tool_call",
+  "call_id": "call_003",
+  "tool_name": "write_file",
+  "arguments": {
+    "path": "lib/widgets/user_profile.dart",
+    "content": "class UserProfile extends StatelessWidget { ... }"
+  },
+  "requires_approval": true
+}
+```
+
+### Сценарий 7: Явное переключение агента
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant IDE
+    participant Gateway
+    participant Architect
+    
+    User->>IDE: Выбрать Architect Agent
+    IDE->>Gateway: switch_agent (architect)
+    Gateway->>Architect: Activate agent
+    Gateway-->>IDE: agent_switched
+    IDE->>User: Показать индикатор агента
+    Architect->>Gateway: Ready
+    Gateway->>IDE: assistant_message
+```
+
+**Пример:**
+
+1. IDE → Gateway:
+```json
+{
+  "type": "switch_agent",
+  "agent_type": "architect",
+  "content": "Спроектируй архитектуру системы аутентификации"
+}
+```
+
+2. Gateway → IDE:
+```json
+{
+  "type": "agent_switched",
+  "from_agent": "coder",
+  "to_agent": "architect",
+  "reason": "User requested agent switch",
+  "timestamp": "2024-01-09T10:10:00Z"
+}
+```
+
+3. Gateway → IDE:
+```json
+{
+  "type": "assistant_message",
+  "token": "Проектирую архитектуру...",
+  "is_final": false
+}
+```
+
 ## Требования к реализации
 
 ### Обязательные требования
@@ -442,8 +621,8 @@ sequenceDiagram
 - `WSToolResult` - Результат инструмента
 - `WSHITLDecision` - Решение HITL
 - `WSErrorResponse` - Сообщение об ошибке
-- `WSAgentSwitched` - Уведомление о переключении агента
-- `WSSwitchAgent` - Запрос на переключение агента
+- `WSAgentSwitched` - Уведомление о переключении агента (мультиагентная система)
+- `WSSwitchAgent` - Запрос на переключение агента (мультиагентная система)
 
 ## Коды ошибок
 
@@ -456,14 +635,61 @@ sequenceDiagram
 | `TOOL_NOT_FOUND` | Инструмент не найден |
 | `TOOL_EXECUTION_ERROR` | Ошибка выполнения инструмента |
 | `SESSION_EXPIRED` | Сессия истекла |
+| `TOKEN_EXPIRED` | JWT токен истек |
+| `TOKEN_INVALID` | Некорректный JWT токен |
 | `UNAUTHORIZED` | Не авторизован |
+
+## Обработка истечения токена
+
+Access токены имеют время жизни 15 минут. Когда токен истекает, Gateway отправляет ошибку:
+
+```json
+{
+  "type": "error",
+  "error_code": "TOKEN_EXPIRED",
+  "content": "JWT token has expired"
+}
+```
+
+**Рекомендуемая обработка:**
+
+1. IDE получает `TOKEN_EXPIRED`
+2. IDE использует refresh token для получения нового access token
+3. IDE закрывает WebSocket соединение
+4. IDE переподключается с новым access token
+5. IDE восстанавливает состояние сессии
+
+**Пример (Dart):**
+```dart
+channel.stream.listen((message) {
+  final data = jsonDecode(message);
+  
+  if (data['type'] == 'error' && data['error_code'] == 'TOKEN_EXPIRED') {
+    // Обновить токен
+    final newToken = await authService.refreshToken();
+    
+    // Закрыть текущее соединение
+    await channel.sink.close();
+    
+    // Переподключиться с новым токеном
+    reconnect(newToken);
+  }
+});
+```
 
 ## Примеры реализации
 
 ### JavaScript/TypeScript
 
 ```typescript
-const ws = new WebSocket('ws://localhost:8000/ws/session_123');
+const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+// Подключение с JWT токеном
+const ws = new WebSocket('ws://localhost:8000/ws/session_123', {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+});
 
 // Отправка сообщения
 ws.send(JSON.stringify({
@@ -484,7 +710,11 @@ ws.onmessage = (event) => {
       handleToolCall(message);
       break;
     case 'error':
-      console.error('Error:', message.content);
+      if (message.error_code === 'TOKEN_EXPIRED') {
+        handleTokenExpired();
+      } else {
+        console.error('Error:', message.content);
+      }
       break;
   }
 };
@@ -493,8 +723,14 @@ ws.onmessage = (event) => {
 ### Dart/Flutter
 
 ```dart
+final accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+// Подключение с JWT токеном
 final channel = WebSocketChannel.connect(
   Uri.parse('ws://localhost:8000/ws/session_123'),
+  headers: {
+    'Authorization': 'Bearer $accessToken',
+  },
 );
 
 // Отправка сообщения
@@ -516,7 +752,11 @@ channel.stream.listen((message) {
       handleToolCall(data);
       break;
     case 'error':
-      print('Error: ${data['content']}');
+      if (data['error_code'] == 'TOKEN_EXPIRED') {
+        handleTokenExpired();
+      } else {
+        print('Error: ${data['content']}');
+      }
       break;
   }
 });
@@ -524,7 +764,9 @@ channel.stream.listen((message) {
 
 ## Дополнительные ресурсы
 
+- [Auth Service API](/docs/api/auth-service) - Аутентификация и получение JWT токенов
+- [Gateway API](/docs/api/gateway) - Документация Gateway Service
 - [Tools Specification](/docs/api/tools-specification) - Спецификация инструментов
 - [Agent Protocol](/docs/api/agent-protocol) - Расширенный протокол агента
-- [Gateway API](/docs/api/gateway) - Документация Gateway Service
+- [Agent Runtime API](/docs/api/agent-runtime) - API документация Agent Runtime
 - [GitHub Repository](https://github.com/pese-git/codelab-workspace)
