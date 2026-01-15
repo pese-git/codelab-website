@@ -199,6 +199,13 @@ agent-runtime/
    - Привязка к пользователям
    - Восстановление после сбоев
 
+5. ⭐ **Planning System** (NEW)
+   - Автоматическое разбиение сложных задач на подзадачи
+   - Управление планами выполнения
+   - Последовательное выполнение с зависимостями
+   - Отслеживание прогресса и статусов
+   - Поддержка состояний `PLAN_PENDING_CONFIRMATION` и `PLAN_EXECUTING`
+
 **Пример кода**:
 ```python
 from app.core.agent_engine import AgentEngine
@@ -657,7 +664,8 @@ CREATE TABLE sessions (
     user_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT NOW(),
     last_activity TIMESTAMP DEFAULT NOW(),
-    metadata JSONB
+    metadata JSONB,
+    state VARCHAR(50) DEFAULT 'ACTIVE'  -- ACTIVE, PLAN_PENDING_CONFIRMATION, PLAN_EXECUTING
 );
 
 -- Диалоги
@@ -682,11 +690,45 @@ CREATE TABLE tool_calls (
     executed_at TIMESTAMP
 );
 
+-- ⭐ Планы выполнения (NEW)
+CREATE TABLE execution_plans (
+    id UUID PRIMARY KEY,
+    plan_id VARCHAR(255) UNIQUE NOT NULL,
+    session_id UUID REFERENCES sessions(id),
+    original_task TEXT NOT NULL,
+    subtasks JSONB NOT NULL,
+    current_subtask_index INTEGER DEFAULT 0,
+    is_complete BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP
+);
+
+-- ⭐ Подзадачи (NEW)
+CREATE TABLE subtasks (
+    id UUID PRIMARY KEY,
+    subtask_id VARCHAR(255) UNIQUE NOT NULL,
+    plan_id VARCHAR(255) REFERENCES execution_plans(plan_id),
+    description TEXT NOT NULL,
+    agent VARCHAR(50) NOT NULL,
+    estimated_time VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'PENDING',  -- PENDING, IN_PROGRESS, COMPLETED, FAILED, SKIPPED
+    result TEXT,
+    error TEXT,
+    dependencies JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP
+);
+
 -- Индексы
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_sessions_state ON sessions(state);
 CREATE INDEX idx_conversations_session_id ON conversations(session_id);
 CREATE INDEX idx_tool_calls_session_id ON tool_calls(session_id);
 CREATE INDEX idx_tool_calls_call_id ON tool_calls(call_id);
+CREATE INDEX idx_execution_plans_session_id ON execution_plans(session_id);
+CREATE INDEX idx_execution_plans_plan_id ON execution_plans(plan_id);
+CREATE INDEX idx_subtasks_plan_id ON subtasks(plan_id);
+CREATE INDEX idx_subtasks_status ON subtasks(status);
 ```
 
 ### Redis Schema
