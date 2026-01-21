@@ -359,9 +359,9 @@ HITL данные используются для:
 
 ## 📚 Дополнительные ресурсы
 
-- [HITL Implementation Guide](../../codelab-ai-service/agent-runtime/doc/HITL_IMPLEMENTATION.md)
-- [HITL Rejection via WebSocket](../../codelab-ai-service/agent-runtime/doc/HITL_REJECTION_VIA_WEBSOCKET.md)
-- [Tool Approval Persistence](../../codelab_ide/doc/tool_approval_persistence_plan.md)
+- [WebSocket Protocol](../api/websocket-protocol.md) - протокол взаимодействия
+- [Agent Protocol](../api/agent-protocol.md) - расширенный протокол агента
+- [Architecture Overview](../architecture/overview.md) - общая архитектура системы
 
 ---
 

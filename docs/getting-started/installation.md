@@ -363,7 +363,7 @@ helm uninstall codelab -n codelab
 kubectl delete pvc -n codelab -l app.kubernetes.io/instance=codelab
 ```
 
-**Подробнее**: См. [`codelab-chart/README.md`](../../codelab-chart/README.md) для полной документации Helm chart.
+**Подробнее**: См. [Deployment Overview](../deployment/overview.md) для полной документации по развертыванию.
 
 ## Установка локальной LLM (опционально)
 

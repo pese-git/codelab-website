@@ -322,10 +322,9 @@ jobs:
 
 ## 📚 Дополнительные ресурсы
 
-- [codelab-chart README](../../codelab-chart/README.md)
-- [Архитектура развертывания](../../codelab-chart/doc/ARCHITECTURE.md)
-- [Руководство по развертыванию](../../codelab-chart/doc/DEPLOYMENT.md)
-- [Конфигурация](../../codelab-chart/doc/CONFIGURATION.md)
+- [Architecture Overview](../architecture/overview.md) - общая архитектура системы
+- [Security](../architecture/security.md) - безопасность системы
+- [Configuration Guide](configuration.md) - детальная конфигурация
 
 ---
 

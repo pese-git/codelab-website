@@ -295,18 +295,18 @@ description: План развития платформы CodeLab на 2026 го
 3. 🚀 **Q3**: Plugin ecosystem с 20+ плагинами
 4. 🌟 **Q4**: Enterprise версия и $10,000 MRR
 
-## 🔗 Детальные планы
+## 🔗 Связанные разделы
 
-- [AI Service Backlog](ai-service.md)
-- [IDE Backlog](ide.md)
-- [Chart Backlog](chart.md)
-- [Benchmark Backlog](benchmark.md)
+- [AI Assistant Overview](../ai-assistant/overview.md) - обзор AI ассистента
+- [IDE Development](../development/ide.md) - разработка IDE
+- [AI Service Development](../development/ai-service.md) - разработка AI сервиса
+- [Deployment Overview](../deployment/overview.md) - развертывание системы
 
 ## 📚 Дополнительные ресурсы
 
-- [Полный Roadmap 2026](../../PROJECT_ROADMAP_2026.md)
-- [Архитектура](../architecture/overview.md)
-- [Документация для разработчиков](../development/overview.md)
+- [Архитектура](../architecture/overview.md) - общая архитектура системы
+- [Getting Started](../getting-started/overview.md) - начало работы
+- [Development Guide](../development/overview.md) - руководство для разработчиков
 
 ---
 
