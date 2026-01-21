@@ -14,30 +14,47 @@ flowchart TB
         IDE[CodeLab IDE<br/>Flutter Desktop]
     end
     
-    subgraph "Gateway Layer"
-        GW[Gateway Service<br/>WebSocket Proxy<br/>Port: 8000]
+    subgraph "Reverse Proxy"
+        NGINX[Nginx<br/>Port: 80<br/>Единая точка входа]
     end
     
     subgraph "Auth Layer"
-        AUTH[Auth Service<br/>OAuth2 Server<br/>Port: 8003]
+        AUTH[Auth Service<br/>OAuth2 Server<br/>JWT RS256]
+        REDIS[Redis<br/>Rate Limiting<br/>Sessions]
+    end
+    
+    subgraph "Gateway Layer"
+        GW[Gateway Service<br/>WebSocket Proxy<br/>Session Management]
     end
     
     subgraph "AI Layer"
-        AR[Agent Runtime<br/>AI Logic & Orchestration<br/>Port: 8001]
-        LP[LLM Proxy<br/>Unified LLM Access<br/>Port: 8002]
+        AR[Agent Runtime<br/>Multi-Agent System<br/>Event-Driven]
+        LP[LLM Proxy<br/>Unified LLM Access<br/>LiteLLM]
+    end
+    
+    subgraph "Data Layer"
+        PG[(PostgreSQL<br/>Sessions<br/>Users<br/>HITL)]
     end
     
     subgraph "LLM Providers"
-        OAI[OpenAI<br/>GPT-4, GPT-3.5]
+        OAI[OpenAI<br/>GPT-4]
         ANT[Anthropic<br/>Claude]
         OLL[Ollama<br/>Local Models]
     end
     
-    IDE -->|OAuth2| AUTH
-    IDE <-->|WebSocket + JWT| GW
-    AUTH <-->|JWT Validation| GW
+    IDE -->|1. OAuth2 Login| NGINX
+    NGINX -->|/oauth/*| AUTH
+    AUTH <-->|Cache| REDIS
+    AUTH <-->|Users/Tokens| PG
+    
+    IDE <-->|2. WebSocket + JWT| NGINX
+    NGINX -->|/api/v1/ws/*| GW
+    GW -->|JWT Validation| AUTH
     GW <-->|HTTP/SSE| AR
+    
+    AR <-->|Sessions/Context| PG
     AR <-->|HTTP/SSE| LP
+    
     LP --> OAI
     LP --> ANT
     LP --> OLL
@@ -114,27 +131,59 @@ flowchart TB
 
 **Подробнее**: [API LLM Proxy](/docs/api/llm-proxy)
 
-### 5. Auth Service
+### 5. Auth Service 🔐
 
-**Назначение**: OAuth2 Authorization Server для аутентификации и авторизации.
+**Назначение**: OAuth2 Authorization Server для аутентификации и авторизации всей платформы.
 
 **Технологии**:
 - Python 3.12+
-- FastAPI
-- SQLAlchemy (async)
+- FastAPI (ASGI)
+- SQLAlchemy 2.0 (async)
 - PostgreSQL/SQLite
-- Redis (rate limiting)
+- Redis (rate limiting, sessions)
+- python-jose (JWT)
+- bcrypt (password hashing)
 
 **Функции**:
-- OAuth2 Password Grant
-- Refresh Token Grant с ротацией
-- JWT токены (RS256)
-- JWKS endpoint для валидации
-- Brute-force protection
-- Rate limiting
-- Audit logging
+- **OAuth2 Password Grant** - аутентификация по username/password
+- **Refresh Token Grant** - обновление токенов с автоматической ротацией
+- **JWT токены (RS256)** - access (15 мин) и refresh (30 дней)
+- **JWKS endpoint** - публичные ключи для валидации токенов
+- **Rate limiting** - защита от brute-force атак
+- **Audit logging** - логирование всех операций
+- **User management** - управление пользователями
+- **Session management** - управление OAuth сессиями
+
+**Endpoints**:
+- `POST /oauth/token` - получение токенов
+- `GET /.well-known/jwks.json` - публичные ключи
+- `GET /health` - health check
+
+**Безопасность**:
+- RS256 подпись токенов (RSA 2048 bit)
+- Bcrypt для хеширования паролей (cost factor 12)
+- IP-based rate limiting (5 req/min)
+- Username-based rate limiting (10 req/hour)
+- Brute-force protection (5 попыток → 15 мин блокировка)
+- Refresh token rotation (одноразовые токены)
 
 **Подробнее**: [API Auth Service](/docs/api/auth-service)
+
+### 6. Nginx Reverse Proxy
+
+**Назначение**: Единая точка входа для всех API запросов.
+
+**Функции**:
+- Маршрутизация между сервисами
+- WebSocket proxy
+- SSL/TLS termination
+- Load balancing (готовность)
+
+**Маршруты**:
+- `/oauth/*` → Auth Service
+- `/.well-known/*` → Auth Service
+- `/api/v1/*` → Gateway Service
+- `/api/v1/ws/*` → Gateway (WebSocket)
 
 ## Поток данных
 
@@ -304,26 +353,47 @@ abstract class ProjectRepository {
 
 ## Безопасность
 
+CodeLab использует многоуровневую систему безопасности для защиты данных и контроля доступа.
+
+**Подробнее**: [Архитектура безопасности](/docs/architecture/security)
+
 ### Аутентификация
 
-- **OAuth2 Password Grant**: Аутентификация пользователей через Auth Service
-- **JWT токены (RS256)**: Access токены для API (15 минут)
-- **Refresh Token Grant**: Обновление токенов с автоматической ротацией (30 дней)
-- **JWKS endpoint**: Публичные ключи для валидации JWT
-- **Session-based**: Для WebSocket соединений
-- **API ключи**: Для LLM провайдеров
+**OAuth2 через Auth Service**:
+- **Password Grant** - аутентификация по username/password
+- **Refresh Token Grant** - автоматическое обновление токенов
+- **JWT токены (RS256)** - криптографически защищенные токены
+  - Access token: 15 минут (короткоживущий)
+  - Refresh token: 30 дней (одноразовый, rotation)
+- **JWKS endpoint** - публичные ключи для валидации
+
+**WebSocket Authentication**:
+- JWT токены в заголовке Authorization
+- Валидация через JWKS
+- Автоматическое переподключение
 
 ### Авторизация
 
-- Role-based access control (RBAC)
-- Разграничение прав доступа к инструментам
-- Валидация tool-calls
+**RBAC (Role-Based Access Control)**:
+- Scopes в JWT токенах (`api:read`, `api:write`)
+- Разграничение прав на уровне агентов
+- Валидация file patterns
+
+**HITL (Human-in-the-Loop)**:
+- Подтверждение опасных операций
+- Редактирование параметров перед выполнением
 
 ### Защита данных
 
+**Шифрование и хеширование**:
+- HTTPS/TLS для внешних соединений
+- Bcrypt для паролей (cost factor 12)
 - Шифрование API ключей
-- Безопасное хранение токенов
-- Изоляция пользовательских данных
+
+**Rate Limiting**:
+- IP-based: 5 req/min
+- Username-based: 10 req/hour
+- Brute-force protection: 5 попыток → 15 мин блокировка
 
 ## Масштабируемость
 

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2
 ---
 
 # Auth Service API
@@ -8,7 +8,9 @@ Auth Service — это OAuth2 Authorization Server для аутентифик�
 
 ## Обзор
 
-**Base URL**: `http://localhost:8003` (внутренний, доступ через Nginx)
+**Base URL**: `http://localhost/oauth` (через Nginx reverse proxy)
+
+**Internal URL**: `http://auth-service:8003` (внутри Docker сети)
 
 **Версия API**: v1
 
@@ -590,8 +592,16 @@ AUTH_SERVICE__LOG_LEVEL=INFO
 
 ## Дополнительные ресурсы
 
-- [Архитектура Auth Service](/docs/architecture/ai-service-architecture#4-auth-service)
-- [Интеграция компонентов](/docs/architecture/integration)
-- [OAuth 2.0 RFC 6749](https://tools.ietf.org/html/rfc6749)
-- [JWT RFC 7519](https://tools.ietf.org/html/rfc7519)
-- [JWKS RFC 7517](https://tools.ietf.org/html/rfc7517)
+### Документация CodeLab
+
+- [API Overview](/docs/api/overview) - Обзор всех API сервисов
+- [Архитектура безопасности](/docs/architecture/security) - Детали безопасности
+- [Архитектура обзор](/docs/architecture/overview) - Общая архитектура
+- [Установка](/docs/getting-started/installation) - Настройка Auth Service
+
+### Спецификации
+
+- [OAuth 2.0 RFC 6749](https://tools.ietf.org/html/rfc6749) - OAuth 2.0 спецификация
+- [JWT RFC 7519](https://tools.ietf.org/html/rfc7519) - JSON Web Token
+- [JWKS RFC 7517](https://tools.ietf.org/html/rfc7517) - JSON Web Key Set
+- [PKCE RFC 7636](https://tools.ietf.org/html/rfc7636) - Proof Key for Code Exchange
