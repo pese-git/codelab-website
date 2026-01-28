@@ -142,12 +142,23 @@ curl http://localhost:8002/health
 {"status": "healthy"}
 ```
 
-### 6. Создание тестового пользователя
+### 6. Настройка Auth Service
 
-Для работы с AI Assistant необходимо создать пользователя в Auth Service:
+Auth Service предоставляет OAuth2 аутентификацию для всей платформы.
+
+#### Создание тестового пользователя
 
 ```bash
-# Войти в контейнер auth-service
+# Создать пользователя через CLI
+docker compose exec auth-service python -m app.scripts.create_user \
+  --username testuser \
+  --email test@codelab.local \
+  --password Test123!@#
+```
+
+Или используйте seed скрипт для создания тестовых данных:
+
+```bash
 docker compose exec auth-service python -c "
 from app.core.seed import seed_default_data
 import asyncio
@@ -158,8 +169,53 @@ asyncio.run(seed_default_data())
 Будет создан тестовый пользователь:
 - **Email**: `test@codelab.local`
 - **Password**: `Test123!@#`
+- **Client ID**: `codelab-flutter-app`
 
 **Важно**: В production окружении измените пароль!
+
+#### Проверка Auth Service
+
+```bash
+# Проверить health check
+curl http://localhost/auth-health
+
+# Получить JWKS (публичные ключи)
+curl http://localhost/.well-known/jwks.json
+
+# Получить токен (тестирование)
+curl -X POST http://localhost/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "username=test@codelab.local" \
+  -d "password=Test123!@#" \
+  -d "client_id=codelab-flutter-app"
+```
+
+Ожидаемый ответ:
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 900,
+  "scope": "api:read api:write"
+}
+```
+
+#### Настройка OAuth2 в IDE
+
+После создания пользователя настройте OAuth2 в IDE:
+
+1. Откройте настройки IDE
+2. Перейдите в раздел "AI Assistant"
+3. Введите данные:
+   - **Auth URL**: `http://localhost/oauth/token`
+   - **Client ID**: `codelab-flutter-app`
+   - **Username**: `test@codelab.local`
+   - **Password**: `Test123!@#`
+4. Нажмите "Подключиться"
+
+IDE автоматически получит access и refresh токены и будет использовать их для аутентификации.
 
 ## Установка в Kubernetes (Production)
 
@@ -307,7 +363,7 @@ helm uninstall codelab -n codelab
 kubectl delete pvc -n codelab -l app.kubernetes.io/instance=codelab
 ```
 
-**Подробнее**: См. [`codelab-chart/README.md`](../../codelab-chart/README.md) для полной документации Helm chart.
+**Подробнее**: См. [Deployment Overview](../deployment/overview.md) для полной документации по развертыванию.
 
 ## Установка локальной LLM (опционально)
 
