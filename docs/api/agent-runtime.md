@@ -332,6 +332,195 @@ print('Текущий агент: ${agentInfo['current_agent']['type']}');
 
 Подробнее см. [Мультиагентная система](/docs/api/multi-agent-system).
 
+## Unified Approval System
+
+Agent Runtime использует централизованную систему управления одобрениями для операций, требующих подтверждения пользователя.
+
+### Архитектура
+
+```mermaid
+graph TB
+    subgraph "Presentation"
+        API[SessionsRouter]
+    end
+    
+    subgraph "Domain"
+        AM[ApprovalManager]
+        Policy[ApprovalPolicy]
+    end
+    
+    subgraph "Infrastructure"
+        Repo[ApprovalRepository]
+        DB[(Database)]
+    end
+    
+    subgraph "Events"
+        EB[EventBus]
+    end
+    
+    API --> AM
+    AM --> Policy
+    AM --> Repo
+    Repo --> DB
+    AM --> EB
+    
+    style AM fill:#ff6b6b
+    style Policy fill:#74c0fc
+```
+
+### Типы одобрений
+
+- **Tool Approvals** - одобрение выполнения инструментов (write_file, execute_command)
+- **Plan Approvals** - одобрение сложных планов выполнения
+
+### Получение pending approvals
+
+```http
+GET /sessions/{session_id}/pending-approvals
+```
+
+**Response:**
+```json
+{
+  "pending_approvals": [
+    {
+      "call_id": "call_123",
+      "tool_name": "write_file",
+      "arguments": {
+        "path": "src/main.py",
+        "content": "..."
+      },
+      "reason": "File modification requires approval"
+    }
+  ]
+}
+```
+
+### Отправка решения
+
+```http
+POST /sessions/{session_id}/hitl-decision
+```
+
+**Request Body:**
+```json
+{
+  "call_id": "call_123",
+  "decision": "approve",
+  "modified_arguments": {},
+  "feedback": ""
+}
+```
+
+**Decisions:**
+- `approve` - одобрить выполнение
+- `edit` - изменить параметры и одобрить
+- `reject` - отклонить выполнение
+
+**Response:** SSE stream с продолжением обработки
+
+### Примеры использования
+
+**Python - Получение pending approvals:**
+```python
+import requests
+
+response = requests.get(
+    "http://localhost:8001/sessions/session_123/pending-approvals",
+    headers={"x-internal-auth": "change-me-internal-key"}
+)
+
+pending = response.json()
+for approval in pending['pending_approvals']:
+    print(f"Tool: {approval['tool_name']}, Reason: {approval['reason']}")
+```
+
+**Python - Одобрение:**
+```python
+response = requests.post(
+    "http://localhost:8001/sessions/session_123/hitl-decision",
+    headers={"x-internal-auth": "change-me-internal-key"},
+    json={
+        "call_id": "call_123",
+        "decision": "approve"
+    },
+    stream=True
+)
+
+for line in response.iter_lines():
+    if line:
+        print(line.decode('utf-8'))
+```
+
+**Dart - Одобрение с изменениями:**
+```dart
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+Future<void> approveWithModifications(
+  String sessionId,
+  String callId,
+  Map<String, dynamic> modifiedArgs
+) async {
+  final response = await http.post(
+    Uri.parse('http://localhost:8001/sessions/$sessionId/hitl-decision'),
+    headers: {
+      'x-internal-auth': 'change-me-internal-key',
+      'Content-Type': 'application/json',
+    },
+    body: jsonEncode({
+      'call_id': callId,
+      'decision': 'edit',
+      'modified_arguments': modifiedArgs,
+      'feedback': 'Modified path for safety'
+    }),
+  );
+  
+  // Process SSE stream
+  await for (var line in response.stream.transform(utf8.decoder).transform(LineSplitter())) {
+    if (line.startsWith('data: ')) {
+      final data = jsonDecode(line.substring(6));
+      print('Event: ${data['type']}');
+    }
+  }
+}
+```
+
+### Approval Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant AM as ApprovalManager
+    participant Repo as Repository
+    participant EB as EventBus
+    
+    Client->>API: tool_call (write_file)
+    API->>AM: should_require_approval()
+    AM-->>API: requires=true
+    API->>AM: add_pending()
+    AM->>Repo: save_pending()
+    AM->>EB: publish(ApprovalRequested)
+    API-->>Client: approval_required
+    
+    Client->>API: approve_decision
+    API->>AM: approve()
+    AM->>Repo: update_status(approved)
+    AM->>EB: publish(ApprovalApproved)
+    API-->>Client: execution continues
+```
+
+### События одобрений
+
+Система публикует события через EventBus:
+
+- `approval.requested` - запрошено одобрение
+- `approval.approved` - одобрение подтверждено
+- `approval.rejected` - одобрение отклонено
+
+Подробнее см. [Unified Approval System Documentation](https://github.com/your-org/codelab/blob/main/codelab-ai-service/agent-runtime/doc/UNIFIED_APPROVAL_SYSTEM.md).
+
 ## Конфигурация
 
 ### Переменные окружения
