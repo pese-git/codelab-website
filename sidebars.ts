@@ -60,6 +60,7 @@ const sidebars: SidebarsConfig = {
         'api/auth-service',
         'api/websocket-protocol',
         'api/agent-protocol',
+        'api/approval-manager',
       ],
     },
     {
@@ -82,6 +83,7 @@ const sidebars: SidebarsConfig = {
         'guides/multi-agent-integration',
         'guides/custom-tools',
         'guides/llm-providers',
+        'guides/troubleshooting-approval-system',
       ],
     },
     {
@@ -93,6 +95,7 @@ const sidebars: SidebarsConfig = {
         'development/ai-service',
         'development/code-style',
         'development/testing',
+        'development/testing-approval-system',
         'development/benchmarking',
         'development/contributing',
       ],
@@ -101,6 +104,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: '📚 Справочник',
       items: [
+        'reference/database-schema',
         'reference/environment-variables',
         'reference/cli-commands',
         'reference/error-codes',

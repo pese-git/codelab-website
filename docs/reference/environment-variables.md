@@ -73,34 +73,363 @@ GATEWAY__USE_JWT_AUTH=true
 
 Сервис выполнения AI агентов.
 
+### Основные переменные
+
 | Переменная | Описание | Значение по умолчанию | Обязательна |
 |------------|----------|----------------------|-------------|
-| `AGENT_RUNTIME__INTERNAL_API_KEY` | Внутренний API ключ | - | Да |
+| `AGENT_RUNTIME__INTERNAL_API_KEY` | Внутренний API ключ для межсервисной аутентификации | - | Да |
 | `AGENT_RUNTIME__LLM_PROXY_URL` | URL LLM Proxy сервиса | `http://localhost:8002` | Да |
 | `AGENT_RUNTIME__LLM_MODEL` | Модель LLM по умолчанию | `fake-llm` | Да |
-| `AGENT_RUNTIME__MULTI_AGENT_MODE` | Режим мульти-агента | `true` | Нет |
+| `AGENT_RUNTIME__MULTI_AGENT_MODE` | Режим мульти-агента (`true`/`false`) | `true` | Нет |
 | `AGENT_RUNTIME__DB_URL` | URL подключения к базе данных | `sqlite:///data/agent_runtime.db` | Да |
-| `AGENT_RUNTIME__LOG_LEVEL` | Уровень логирования | `INFO` | Нет |
+| `AGENT_RUNTIME__LOG_LEVEL` | Уровень логирования (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` | Нет |
 | `AGENT_RUNTIME__VERSION` | Версия сервиса | `0.2.0` | Нет |
-| `AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS` | Максимум одновременных запросов | `100` | Нет |
-| `AGENT_RUNTIME__REQUEST_TIMEOUT` | Таймаут запросов (секунды) | `30` | Нет |
 
-### Примеры значений
+### Производительность и лимиты
 
-**Режим разработки (SQLite + fake LLM):**
+| Переменная | Описание | Значение по умолчанию | Обязательна |
+|------------|----------|----------------------|-------------|
+| `AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS` | Максимальное количество одновременных запросов | `100` | Нет |
+| `AGENT_RUNTIME__REQUEST_TIMEOUT` | Таймаут запросов в секундах | `30` | Нет |
+| `AGENT_RUNTIME__MAX_RETRIES` | Максимальное количество повторных попыток при ошибках | `3` | Нет |
+| `AGENT_RUNTIME__RETRY_DELAY` | Задержка между повторными попытками (секунды) | `1` | Нет |
+
+### Approval System
+
+| Переменная | Описание | Значение по умолчанию | Обязательна |
+|------------|----------|----------------------|-------------|
+| `AGENT_RUNTIME__APPROVAL_ENABLED` | Включить систему одобрений | `true` | Нет |
+| `AGENT_RUNTIME__APPROVAL_TIMEOUT` | Таймаут ожидания одобрения (секунды) | `300` | Нет |
+| `AGENT_RUNTIME__AUTO_APPROVE_SAFE_TOOLS` | Автоматически одобрять безопасные инструменты | `true` | Нет |
+
+### Event System
+
+| Переменная | Описание | Значение по умолчанию | Обязательна |
+|------------|----------|----------------------|-------------|
+| `AGENT_RUNTIME__EVENT_BUS_ENABLED` | Включить шину событий | `true` | Нет |
+| `AGENT_RUNTIME__EVENT_RETENTION_HOURS` | Время хранения событий (часы) | `24` | Нет |
+| `AGENT_RUNTIME__PUBLISH_METRICS_EVENTS` | Публиковать события метрик | `true` | Нет |
+
+### Мониторинг и метрики
+
+| Переменная | Описание | Значение по умолчанию | Обязательна |
+|------------|----------|----------------------|-------------|
+| `AGENT_RUNTIME__ENABLE_METRICS` | Включить сбор метрик | `true` | Нет |
+| `AGENT_RUNTIME__METRICS_PORT` | Порт для Prometheus метрик | `9090` | Нет |
+| `AGENT_RUNTIME__ENABLE_TRACING` | Включить distributed tracing | `false` | Нет |
+| `AGENT_RUNTIME__JAEGER_ENDPOINT` | Endpoint для Jaeger tracing | - | Нет |
+
+### Детальное описание переменных
+
+#### AGENT_RUNTIME__INTERNAL_API_KEY
+
+Секретный ключ для аутентификации между внутренними сервисами (Gateway ↔ Agent Runtime).
+
+**Требования:**
+- Минимум 32 символа
+- Используйте криптографически стойкий генератор
+
+**Генерация:**
 ```bash
-AGENT_RUNTIME__DB_URL=sqlite:///data/agent_runtime.db
-AGENT_RUNTIME__LLM_PROXY_URL=http://llm-proxy:8002
-AGENT_RUNTIME__LLM_MODEL=fake-llm
-AGENT_RUNTIME__MULTI_AGENT_MODE=true
+# Linux/macOS
+openssl rand -hex 32
+
+# Python
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-**Production (PostgreSQL + реальная модель):**
+**Пример:**
 ```bash
-AGENT_RUNTIME__DB_URL=postgresql+asyncpg://agent_user:agent_password@postgres:5432/agent_runtime
+AGENT_RUNTIME__INTERNAL_API_KEY=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+```
+
+#### AGENT_RUNTIME__LLM_PROXY_URL
+
+URL LLM Proxy сервиса для отправки запросов к языковым моделям.
+
+**Форматы:**
+```bash
+# Локальная разработка
+AGENT_RUNTIME__LLM_PROXY_URL=http://localhost:8002
+
+# Docker Compose
 AGENT_RUNTIME__LLM_PROXY_URL=http://llm-proxy:8002
+
+# Kubernetes
+AGENT_RUNTIME__LLM_PROXY_URL=http://llm-proxy.default.svc.cluster.local:8002
+
+# Внешний сервис
+AGENT_RUNTIME__LLM_PROXY_URL=https://llm-proxy.example.com
+```
+
+#### AGENT_RUNTIME__LLM_MODEL
+
+Модель LLM, используемая по умолчанию для всех агентов.
+
+**Поддерживаемые модели:**
+```bash
+# OpenAI
+AGENT_RUNTIME__LLM_MODEL=gpt-4
+AGENT_RUNTIME__LLM_MODEL=gpt-4-turbo
+AGENT_RUNTIME__LLM_MODEL=gpt-3.5-turbo
+
+# Anthropic
+AGENT_RUNTIME__LLM_MODEL=claude-3-opus-20240229
+AGENT_RUNTIME__LLM_MODEL=claude-3-sonnet-20240229
+
+# Open Source (через Ollama/LiteLLM)
+AGENT_RUNTIME__LLM_MODEL=llama3
+AGENT_RUNTIME__LLM_MODEL=mistral
+AGENT_RUNTIME__LLM_MODEL=Qwen/Qwen3-0.6B
+
+# Тестирование
+AGENT_RUNTIME__LLM_MODEL=fake-llm
+```
+
+#### AGENT_RUNTIME__MULTI_AGENT_MODE
+
+Режим работы агентов:
+- `true` - Multi-Agent режим (специализированные агенты)
+- `false` - Single-Agent режим (UniversalAgent)
+
+**Рекомендации:**
+- Development: `true` (для тестирования всех агентов)
+- Production: `true` (лучшая производительность)
+- Простые задачи: `false` (меньше overhead)
+
+```bash
+# Multi-Agent (рекомендуется)
+AGENT_RUNTIME__MULTI_AGENT_MODE=true
+
+# Single-Agent
+AGENT_RUNTIME__MULTI_AGENT_MODE=false
+```
+
+#### AGENT_RUNTIME__DB_URL
+
+URL подключения к базе данных для хранения сессий, approvals, метрик.
+
+**SQLite (разработка):**
+```bash
+# Файловая БД
+AGENT_RUNTIME__DB_URL=sqlite:///data/agent_runtime.db
+
+# In-memory (только для тестов!)
+AGENT_RUNTIME__DB_URL=sqlite:///:memory:
+```
+
+**PostgreSQL (production):**
+```bash
+# Стандартный драйвер
+AGENT_RUNTIME__DB_URL=postgresql://user:password@localhost:5432/agent_runtime
+
+# Async драйвер (рекомендуется)
+AGENT_RUNTIME__DB_URL=postgresql+asyncpg://user:password@localhost:5432/agent_runtime
+
+# С SSL
+AGENT_RUNTIME__DB_URL=postgresql+asyncpg://user:password@localhost:5432/agent_runtime?ssl=require
+
+# Connection pool параметры
+AGENT_RUNTIME__DB_URL=postgresql+asyncpg://user:password@localhost:5432/agent_runtime?pool_size=20&max_overflow=10
+```
+
+#### AGENT_RUNTIME__LOG_LEVEL
+
+Уровень детализации логов.
+
+**Уровни:**
+- `DEBUG` - максимальная детализация (разработка)
+- `INFO` - информационные сообщения (production по умолчанию)
+- `WARNING` - только предупреждения и ошибки
+- `ERROR` - только ошибки
+
+```bash
+# Разработка
+AGENT_RUNTIME__LOG_LEVEL=DEBUG
+
+# Production
+AGENT_RUNTIME__LOG_LEVEL=INFO
+
+# Минимальное логирование
+AGENT_RUNTIME__LOG_LEVEL=ERROR
+```
+
+#### AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS
+
+Максимальное количество одновременно обрабатываемых запросов.
+
+**Рекомендации:**
+- Зависит от доступных ресурсов (CPU, память)
+- Учитывайте лимиты LLM провайдера
+- Мониторьте использование ресурсов
+
+```bash
+# Низкая нагрузка
+AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=10
+
+# Средняя нагрузка (по умолчанию)
+AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=100
+
+# Высокая нагрузка
+AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=500
+```
+
+#### AGENT_RUNTIME__REQUEST_TIMEOUT
+
+Таймаут для обработки одного запроса (в секундах).
+
+**Рекомендации:**
+- Учитывайте время генерации LLM
+- Учитывайте время выполнения инструментов
+- Добавьте запас для сетевых задержек
+
+```bash
+# Быстрые запросы
+AGENT_RUNTIME__REQUEST_TIMEOUT=10
+
+# Стандартные запросы (по умолчанию)
+AGENT_RUNTIME__REQUEST_TIMEOUT=30
+
+# Сложные задачи
+AGENT_RUNTIME__REQUEST_TIMEOUT=120
+```
+
+### Примеры конфигураций
+
+#### Development (локальная разработка)
+
+```bash
+# Основные настройки
+AGENT_RUNTIME__INTERNAL_API_KEY=dev-key-change-in-production
+AGENT_RUNTIME__LLM_PROXY_URL=http://localhost:8002
+AGENT_RUNTIME__LLM_MODEL=fake-llm
+AGENT_RUNTIME__MULTI_AGENT_MODE=true
+
+# База данных
+AGENT_RUNTIME__DB_URL=sqlite:///data/agent_runtime.db
+
+# Логирование
+AGENT_RUNTIME__LOG_LEVEL=DEBUG
+
+# Производительность
+AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=10
+AGENT_RUNTIME__REQUEST_TIMEOUT=30
+
+# Approval System
+AGENT_RUNTIME__APPROVAL_ENABLED=true
+AGENT_RUNTIME__AUTO_APPROVE_SAFE_TOOLS=true
+
+# События и метрики
+AGENT_RUNTIME__EVENT_BUS_ENABLED=true
+AGENT_RUNTIME__ENABLE_METRICS=true
+AGENT_RUNTIME__ENABLE_TRACING=false
+```
+
+#### Staging (тестовое окружение)
+
+```bash
+# Основные настройки
+AGENT_RUNTIME__INTERNAL_API_KEY=${INTERNAL_API_KEY}  # Из secrets
+AGENT_RUNTIME__LLM_PROXY_URL=http://llm-proxy:8002
+AGENT_RUNTIME__LLM_MODEL=gpt-3.5-turbo
+AGENT_RUNTIME__MULTI_AGENT_MODE=true
+
+# База данных
+AGENT_RUNTIME__DB_URL=postgresql+asyncpg://agent_user:${DB_PASSWORD}@postgres:5432/agent_runtime_staging
+
+# Логирование
+AGENT_RUNTIME__LOG_LEVEL=INFO
+
+# Производительность
+AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=50
+AGENT_RUNTIME__REQUEST_TIMEOUT=60
+AGENT_RUNTIME__MAX_RETRIES=3
+AGENT_RUNTIME__RETRY_DELAY=2
+
+# Approval System
+AGENT_RUNTIME__APPROVAL_ENABLED=true
+AGENT_RUNTIME__APPROVAL_TIMEOUT=600
+AGENT_RUNTIME__AUTO_APPROVE_SAFE_TOOLS=true
+
+# События и метрики
+AGENT_RUNTIME__EVENT_BUS_ENABLED=true
+AGENT_RUNTIME__EVENT_RETENTION_HOURS=48
+AGENT_RUNTIME__ENABLE_METRICS=true
+AGENT_RUNTIME__METRICS_PORT=9090
+AGENT_RUNTIME__ENABLE_TRACING=true
+AGENT_RUNTIME__JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+```
+
+#### Production (боевое окружение)
+
+```bash
+# Основные настройки
+AGENT_RUNTIME__INTERNAL_API_KEY=${INTERNAL_API_KEY}  # Из Kubernetes secrets
+AGENT_RUNTIME__LLM_PROXY_URL=http://llm-proxy.default.svc.cluster.local:8002
 AGENT_RUNTIME__LLM_MODEL=gpt-4
 AGENT_RUNTIME__MULTI_AGENT_MODE=true
+AGENT_RUNTIME__VERSION=1.0.0
+
+# База данных (managed PostgreSQL)
+AGENT_RUNTIME__DB_URL=postgresql+asyncpg://agent_user:${DB_PASSWORD}@postgres.example.com:5432/agent_runtime?ssl=require&pool_size=20&max_overflow=10
+
+# Логирование
+AGENT_RUNTIME__LOG_LEVEL=INFO
+
+# Производительность
+AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS=200
+AGENT_RUNTIME__REQUEST_TIMEOUT=90
+AGENT_RUNTIME__MAX_RETRIES=5
+AGENT_RUNTIME__RETRY_DELAY=3
+
+# Approval System
+AGENT_RUNTIME__APPROVAL_ENABLED=true
+AGENT_RUNTIME__APPROVAL_TIMEOUT=300
+AGENT_RUNTIME__AUTO_APPROVE_SAFE_TOOLS=false  # Строгий режим
+
+# События и метрики
+AGENT_RUNTIME__EVENT_BUS_ENABLED=true
+AGENT_RUNTIME__EVENT_RETENTION_HOURS=168  # 7 дней
+AGENT_RUNTIME__PUBLISH_METRICS_EVENTS=true
+AGENT_RUNTIME__ENABLE_METRICS=true
+AGENT_RUNTIME__METRICS_PORT=9090
+AGENT_RUNTIME__ENABLE_TRACING=true
+AGENT_RUNTIME__JAEGER_ENDPOINT=http://jaeger-collector.monitoring.svc.cluster.local:14268/api/traces
+
+# Общие
+ENVIRONMENT=production
+TZ=UTC
+```
+
+#### Docker Compose (полный стек)
+
+```bash
+# docker-compose.yml environment
+services:
+  agent-runtime:
+    environment:
+      # Основные
+      AGENT_RUNTIME__INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-me}
+      AGENT_RUNTIME__LLM_PROXY_URL: http://llm-proxy:8002
+      AGENT_RUNTIME__LLM_MODEL: ${LLM_MODEL:-gpt-3.5-turbo}
+      AGENT_RUNTIME__MULTI_AGENT_MODE: "true"
+      
+      # База данных
+      AGENT_RUNTIME__DB_URL: postgresql+asyncpg://codelab:${POSTGRES_PASSWORD}@postgres:5432/agent_runtime
+      
+      # Логирование
+      AGENT_RUNTIME__LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Производительность
+      AGENT_RUNTIME__MAX_CONCURRENT_REQUESTS: 100
+      AGENT_RUNTIME__REQUEST_TIMEOUT: 60
+      
+      # Approval System
+      AGENT_RUNTIME__APPROVAL_ENABLED: "true"
+      
+      # Метрики
+      AGENT_RUNTIME__ENABLE_METRICS: "true"
+      AGENT_RUNTIME__METRICS_PORT: 9090
 ```
 
 ## LLM Proxy
