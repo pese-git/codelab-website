@@ -9,7 +9,7 @@ sidebar_position: 1
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Flutter](https://img.shields.io/badge/Flutter-3.38.5-02569B?logo=flutter)
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python)
-![Status](https://img.shields.io/badge/status-Production%20Ready-success)
+![Status](https://img.shields.io/badge/status-In%20Development-yellow)
 
 ## 🎯 Что такое CodeLab?
 
@@ -158,8 +158,8 @@ graph TB
 ## 📊 Статус проекта
 
 **Версия**: 1.0.0 (MVP)  
-**Дата релиза**: Январь 2026  
-**Статус**: ✅ Production Ready
+**Дата релиза**: Январь 2026
+**Статус**: 🚧 In Development
 
 ### Реализовано
 - ✅ Мультиагентная система (5 агентов)
